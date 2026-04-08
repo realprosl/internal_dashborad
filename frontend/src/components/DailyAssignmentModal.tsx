@@ -5,7 +5,7 @@ import {
   For,
   Show,
 } from "solid-js";
-import { CloseIcon, CalendarIcon } from "./Icons";
+import { CloseIcon } from "./Icons";
 
 type Obra = {
   id: number;
@@ -184,24 +184,7 @@ export default function DailyAssignmentModal(props: DailyAssignmentModalProps) {
   return (
     <Show when={props.show}>
       <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-fit max-w-[99%] h-[90vh] flex flex-col">
-          {/* Header */}
-          <div class="flex justify-between items-center p-6 border-b dark:border-gray-700">
-            <div class="flex items-center space-x-3">
-              <CalendarIcon class="text-blue-600 dark:text-blue-400" />
-              <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
-                Asignación Diaria
-              </h3>
-            </div>
-            <button
-              onClick={handleClose}
-              class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              aria-label="Cerrar"
-            >
-              <CloseIcon class="w-6 h-6" />
-            </button>
-          </div>
-
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-fit max-w-[99%] h-fit max-h-[99vh] flex flex-col">
           {/* Contenido */}
           <div class="p-6 space-y-4 flex-1 overflow-hidden">
             {/* Selector de fecha y estado */}
@@ -222,10 +205,17 @@ export default function DailyAssignmentModal(props: DailyAssignmentModalProps) {
                   </span>
                 </Show>
               </div>
+              <button
+                onClick={handleClose}
+                class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                aria-label="Cerrar"
+              >
+                <CloseIcon class="w-6 h-6" />
+              </button>
             </div>
 
             {/* Tabla de asignaciones */}
-            <div class="border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden flex-1 overflow-auto">
+            <div class="border border-gray-300 dark:border-gray-700 rounded-lg flex-1 flex flex-col overflow-hidden">
               <Show
                 when={
                   !obrasActivas.loading &&
@@ -242,61 +232,67 @@ export default function DailyAssignmentModal(props: DailyAssignmentModalProps) {
                 }
               >
                 <Show when={obrasActivas() && operarios()}>
-                  <div class="overflow-auto h-[calc(90vh-300px)]">
-                    <table class="min-w-full border-collapse table-fixed">
-                      {" "}
-                      <thead class="sticky top-0 bg-white dark:bg-gray-800 z-10">
-                        <tr>
-                          <th class="sticky left-0 bg-white dark:bg-gray-800 p-2 border-b border-r border-gray-300 dark:border-gray-700 text-left font-semibold text-gray-700 dark:text-gray-300 w-40 text-sm">
-                            Obras \ Op.
-                          </th>
+                  <div class="flex-1 overflow-hidden">
+                    <div class="h-full overflow-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:hover:scrollbar-thumb-gray-500">
+                      <table class="min-w-full border-collapse table-fixed">
+                        {" "}
+                        <thead class="sticky top-0 bg-white dark:bg-gray-800 z-10">
+                          <tr>
+                            <th class="sticky left-0 bg-white dark:bg-gray-800 p-2 border-b border-r border-gray-300 dark:border-gray-700 text-left font-semibold text-gray-700 dark:text-gray-300 min-w-max text-sm">
+                              Obras \ Operarios
+                            </th>
 
-                          <For each={operarios()}>
-                            {(operario) => (
-                              <th class="p-2 border-b border-gray-300 dark:border-gray-700 text-center font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-[70px] max-w-[100px] text-xs">
-                                <div class="truncate" title={operario.nombre}>
-                                  {operario.nombre}
-                                </div>
-                              </th>
+                            <For each={operarios()}>
+                              {(operario) => (
+                                <th class="p-2 border-b border-gray-300 dark:border-gray-700 text-center font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-[70px] max-w-[100px] text-xs">
+                                  <div class="truncate" title={operario.nombre}>
+                                    {operario.nombre}
+                                  </div>
+                                </th>
+                              )}
+                            </For>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <For each={obrasActivas()}>
+                            {(obra, index) => (
+                              <tr
+                                class={`hover:bg-gray-50 dark:hover:bg-gray-800/50 ${index() % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-gray-50 dark:bg-gray-800/70"}`}
+                              >
+                                <td class="sticky left-0 p-2 border-b border-r border-gray-300 dark:border-gray-700 font-medium text-gray-900 dark:text-white whitespace-nowrap text-sm min-w-max">
+                                  <div title={obra.nombre}>
+                                    {obra.id + ". " + obra.nombre}
+                                  </div>
+                                </td>
+
+                                <For each={operarios()}>
+                                  {(operario) => (
+                                    <td
+                                      class={`p-1 border-b border-gray-300 dark:border-gray-700 cursor-pointer transition-all duration-200 ${
+                                        isAssigned(obra.id, operario.id)
+                                          ? "bg-green-500 hover:bg-green-600 text-white"
+                                          : index() % 2 === 0
+                                            ? "bg-white hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700"
+                                            : "bg-gray-50 hover:bg-gray-200 dark:bg-gray-800/70 dark:hover:bg-gray-600"
+                                      }`}
+                                      onClick={() =>
+                                        toggleAssignment(obra.id, operario.id)
+                                      }
+                                    >
+                                      <div class="flex items-center justify-center h-8">
+                                        {isAssigned(obra.id, operario.id)
+                                          ? "✓"
+                                          : ""}
+                                      </div>
+                                    </td>
+                                  )}
+                                </For>
+                              </tr>
                             )}
                           </For>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <For each={obrasActivas()}>
-                          {(obra) => (
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                              <td class="sticky left-0 bg-white dark:bg-gray-800 p-2 border-b border-r border-gray-300 dark:border-gray-700 font-medium text-gray-900 dark:text-white whitespace-nowrap text-sm">
-                                <div class="truncate w-36" title={obra.nombre}>
-                                  {obra.nombre}
-                                </div>
-                              </td>
-
-                              <For each={operarios()}>
-                                {(operario) => (
-                                  <td
-                                    class={`p-1 border-b border-gray-300 dark:border-gray-700 cursor-pointer transition-all duration-200 ${
-                                      isAssigned(obra.id, operario.id)
-                                        ? "bg-green-500 hover:bg-green-600 text-white"
-                                        : "bg-gray-50 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
-                                    }`}
-                                    onClick={() =>
-                                      toggleAssignment(obra.id, operario.id)
-                                    }
-                                  >
-                                    <div class="flex items-center justify-center h-8">
-                                      {isAssigned(obra.id, operario.id)
-                                        ? "✓"
-                                        : ""}
-                                    </div>
-                                  </td>
-                                )}
-                              </For>
-                            </tr>
-                          )}
-                        </For>
-                      </tbody>
-                    </table>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </Show>
               </Show>

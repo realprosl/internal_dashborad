@@ -1,0 +1,3 @@
+#!/bin/bash
+
+./backend/app & npm --prefix ./frontend run dev

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -174,7 +175,8 @@ func main() {
 	})
 
 	// Servir archivos estáticos del frontend
-	frontendDist := filepath.Join("..", "frontend", "dist")
+	// Primero intentar desde el directorio actual (para producción/build)
+	frontendDist := filepath.Join("frontend", "dist")
 	absFrontendDist, err := filepath.Abs(frontendDist)
 	if err != nil {
 		log.Println("Warning: cannot get absolute path, using relative:", err)
@@ -182,6 +184,19 @@ func main() {
 	} else {
 		frontendDist = absFrontendDist
 	}
+
+	// Si no existe, intentar desde el directorio padre (para desarrollo)
+	if _, err := os.Stat(frontendDist); os.IsNotExist(err) {
+		frontendDist = filepath.Join("..", "frontend", "dist")
+		absFrontendDist, err = filepath.Abs(frontendDist)
+		if err != nil {
+			log.Println("Warning: cannot get absolute path, using relative:", err)
+			absFrontendDist = frontendDist
+		} else {
+			frontendDist = absFrontendDist
+		}
+	}
+
 	log.Println("Serving frontend from:", frontendDist)
 
 	// Servir archivos estáticos

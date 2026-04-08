@@ -78,14 +78,30 @@ func (h *ObraHandler) CreateObra(w http.ResponseWriter, r *http.Request) {
 		h.jsonResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	result, err := h.db.Exec("INSERT INTO obras (nombre, valor_contrato, estado) VALUES (?, ?, ?)",
-		obra.Nombre, obra.ValorContrato, obra.Estado)
+
+	var result sql.Result
+	var err error
+
+	// Si se proporciona un ID, usarlo; de lo contrario, dejar que SQLite genere uno
+	if obra.ID > 0 {
+		result, err = h.db.Exec("INSERT INTO obras (id, nombre, valor_contrato, estado) VALUES (?, ?, ?, ?)",
+			obra.ID, obra.Nombre, obra.ValorContrato, obra.Estado)
+	} else {
+		result, err = h.db.Exec("INSERT INTO obras (nombre, valor_contrato, estado) VALUES (?, ?, ?)",
+			obra.Nombre, obra.ValorContrato, obra.Estado)
+	}
+
 	if err != nil {
 		h.jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	id, _ := result.LastInsertId()
-	obra.ID = int(id)
+
+	// Si no se proporcionó ID, obtener el generado automáticamente
+	if obra.ID == 0 {
+		id, _ := result.LastInsertId()
+		obra.ID = int(id)
+	}
+
 	h.jsonResponse(w, http.StatusCreated, obra)
 }
 

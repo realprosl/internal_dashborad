@@ -1,6 +1,12 @@
-import { createResource, For, createSignal, createMemo } from 'solid-js';
-import { useTheme } from '../contexts/ThemeContext';
-import { SortIcon, SortUpIcon, SortDownIcon, EditIcon, DeleteIcon, CloseIcon, PersonIcon } from '../components/Icons';
+import { createResource, For, createSignal, createMemo } from "solid-js";
+import { useTheme } from "../contexts/ThemeContext";
+import {
+  SortIcon,
+  SortUpIcon,
+  SortDownIcon,
+  CloseIcon,
+  PersonIcon,
+} from "../components/Icons";
 
 type Operario = {
   id: number;
@@ -9,26 +15,26 @@ type Operario = {
 };
 
 async function fetchOperarios(): Promise<Operario[]> {
-  const response = await fetch('/api/operarios');
-  if (!response.ok) throw new Error('Failed to fetch operarios');
+  const response = await fetch("/api/operarios");
+  if (!response.ok) throw new Error("Failed to fetch operarios");
   return response.json();
 }
 
-type SortField = 'id' | 'nombre' | 'gasto_diario';
-type SortDirection = 'asc' | 'desc';
+type SortField = "id" | "nombre" | "gasto_diario";
+type SortDirection = "asc" | "desc";
 
 export default function OperariosPage() {
   const { theme } = useTheme();
   const [operarios, { mutate }] = createResource(fetchOperarios);
-  const [search, setSearch] = createSignal('');
-  const [sortField, setSortField] = createSignal<SortField>('id');
-  const [sortDirection, setSortDirection] = createSignal<SortDirection>('asc');
+  const [search, setSearch] = createSignal("");
+  const [sortField, setSortField] = createSignal<SortField>("id");
+  const [sortDirection, setSortDirection] = createSignal<SortDirection>("asc");
   const [showModal, setShowModal] = createSignal(false);
   const [editingId, setEditingId] = createSignal<number | null>(null);
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [formData, setFormData] = createSignal({
-    nombre: '',
+    nombre: "",
     gasto_diario: 0,
   });
 
@@ -40,7 +46,7 @@ export default function OperariosPage() {
           (o) =>
             o.nombre.toLowerCase().includes(term) ||
             o.id.toString().includes(term) ||
-            o.gasto_diario.toString().includes(term)
+            o.gasto_diario.toString().includes(term),
         )
       : data;
 
@@ -48,38 +54,42 @@ export default function OperariosPage() {
     const dir = sortDirection();
     return [...filtered].sort((a, b) => {
       let aVal, bVal;
-      if (field === 'gasto_diario') {
+      if (field === "gasto_diario") {
         aVal = a.gasto_diario;
         bVal = b.gasto_diario;
-      } else if (field === 'id') {
+      } else if (field === "id") {
         aVal = a.id;
         bVal = b.id;
       } else {
         aVal = a.nombre.toLowerCase();
         bVal = b.nombre.toLowerCase();
       }
-      if (aVal < bVal) return dir === 'asc' ? -1 : 1;
-      if (aVal > bVal) return dir === 'asc' ? 1 : -1;
+      if (aVal < bVal) return dir === "asc" ? -1 : 1;
+      if (aVal > bVal) return dir === "asc" ? 1 : -1;
       return 0;
     });
   });
 
   const handleSort = (field: SortField) => {
     if (sortField() === field) {
-      setSortDirection(sortDirection() === 'asc' ? 'desc' : 'asc');
+      setSortDirection(sortDirection() === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortDirection('asc');
+      setSortDirection("asc");
     }
   };
 
   const SortIconComponent = (field: SortField) => {
     if (sortField() !== field) return <SortIcon class="inline ml-1" />;
-    return sortDirection() === 'asc' ? <SortUpIcon class="inline ml-1" /> : <SortDownIcon class="inline ml-1" />;
+    return sortDirection() === "asc" ? (
+      <SortUpIcon class="inline ml-1" />
+    ) : (
+      <SortDownIcon class="inline ml-1" />
+    );
   };
 
   const handleEdit = (id: number) => {
-    const operario = operarios()?.find(o => o.id === id);
+    const operario = operarios()?.find((o) => o.id === id);
     if (operario) {
       setEditingId(id);
       setFormData({
@@ -92,10 +102,12 @@ export default function OperariosPage() {
   };
 
   const handleDelete = (id: number) => {
-    if (confirm('¿Eliminar este operario?')) {
-      fetch(`/api/operarios/${id}`, { method: 'DELETE' })
+    if (confirm("¿Eliminar este operario?")) {
+      fetch(`/api/operarios/${id}`, { method: "DELETE" })
         .then(() => {
-          mutate((old: Operario[] | undefined) => old?.filter(o => o.id !== id));
+          mutate((old: Operario[] | undefined) =>
+            old?.filter((o) => o.id !== id),
+          );
         })
         .catch(console.error);
     }
@@ -103,7 +115,7 @@ export default function OperariosPage() {
 
   const handleCreate = () => {
     setEditingId(null);
-    setFormData({ nombre: '', gasto_diario: 0 });
+    setFormData({ nombre: "", gasto_diario: 0 });
     setError(null);
     setShowModal(true);
   };
@@ -114,44 +126,51 @@ export default function OperariosPage() {
     setError(null);
     const data = formData();
     const id = editingId();
-    const url = id ? `/api/operarios/${id}` : '/api/operarios';
-    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/api/operarios/${id}` : "/api/operarios";
+    const method = id ? "PUT" : "POST";
     fetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     })
-      .then(res => {
+      .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         return res.json();
       })
-      .then(savedOperario => {
+      .then((savedOperario) => {
         if (id) {
-          mutate((old) => old?.map(o => o.id === id ? savedOperario : o) || []);
+          mutate(
+            (old) => old?.map((o) => (o.id === id ? savedOperario : o)) || [],
+          );
         } else {
-          mutate((old) => old ? [...old, savedOperario] : [savedOperario]);
+          mutate((old) => (old ? [...old, savedOperario] : [savedOperario]));
         }
         setShowModal(false);
         setEditingId(null);
       })
-      .catch(err => {
-        setError(err.message || 'Error al guardar');
+      .catch((err) => {
+        setError(err.message || "Error al guardar");
         console.error(err);
       })
       .finally(() => setLoading(false));
   };
 
-  const handleInputChange = (field: keyof ReturnType<typeof formData>, value: any) => {
+  const handleInputChange = (
+    field: keyof ReturnType<typeof formData>,
+    value: any,
+  ) => {
     setFormData({ ...formData(), [field]: value });
   };
 
   return (
     <div class="p-6">
       <div class="flex justify-between items-center mb-6">
-         <div class="flex items-center space-x-3">
-           <PersonIcon class="text-blue-600 dark:text-blue-400" />
-           <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Operarios</h1>
-         </div>
+        <div class="flex items-center space-x-3">
+          <PersonIcon class="text-blue-600 dark:text-blue-400" />
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+            Operarios
+          </h1>
+        </div>
         <button
           onClick={handleCreate}
           class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
@@ -159,90 +178,98 @@ export default function OperariosPage() {
           Nuevo Operario
         </button>
       </div>
-       <div class="mb-6 relative">
-         <input
-           type="text"
-           placeholder="Buscar..."
-           class="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-           value={search()}
-           onInput={(e) => setSearch(e.currentTarget.value)}
-         />
-         {search() && (
-           <button
-             type="button"
-             onClick={() => setSearch('')}
-             class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-             aria-label="Limpiar búsqueda"
-           >
-             <CloseIcon class="w-4 h-4" />
-           </button>
-         )}
-        </div>
-       {operarios.loading && (
-         <div class="text-center py-8">
-           <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-           <p class="mt-2 text-gray-600 dark:text-gray-400">Cargando operarios...</p>
-         </div>
-       )}
-       {operarios.error && (
-         <div class="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg mb-4">
-           <p class="text-red-800 dark:text-red-200">Error al cargar operarios: {operarios.error.message}</p>
-         </div>
-       )}
-       {!operarios.loading && !operarios.error && (
-          <div class="overflow-x-auto">
-            {/* Header */}
-             <div class={`grid grid-cols-3 gap-3 px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300 ${theme() === 'dark' ? 'bg-gray-800' : 'bg-gray-100'} border-b border-gray-200 dark:border-gray-700`}>
-               <div class="cursor-pointer flex items-center justify-center" onClick={() => handleSort('id')}>
-                 <span>ID</span>
-                 {SortIconComponent('id')}
-               </div>
-               <div class="cursor-pointer flex items-center justify-center" onClick={() => handleSort('nombre')}>
-                 <span>Nombre</span>
-                 {SortIconComponent('nombre')}
-               </div>
-               <div class="cursor-pointer flex items-center justify-center" onClick={() => handleSort('gasto_diario')}>
-                 <span>Gasto Diario</span>
-                 {SortIconComponent('gasto_diario')}
-               </div>
-             </div>
-            {/* Body */}
-            <div>
-              <For each={filteredAndSorted()}>
-                 {(operario) => (
-                   <div class="grid grid-cols-3 gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 group relative items-center text-center">
-                     <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                       {operario.id}
-                     </div>
-                     <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                       {operario.nombre}
-                     </div>
-                     <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                       ${operario.gasto_diario.toLocaleString()}
-                     </div>
-                    {/* Action buttons */}
-                    <div class="absolute right-4 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-2">
-                       <button
-                         onClick={() => handleEdit(operario.id)}
-                         class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                         title="Editar"
-                       >
-                         <EditIcon />
-                       </button>
-                       <button
-                         onClick={() => handleDelete(operario.id)}
-                         class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                         title="Eliminar"
-                       >
-                         <DeleteIcon />
-                       </button>
-                    </div>
-                  </div>
-                )}
-              </For>
-            </div>
-            </div>
+      <div class="mb-6 relative">
+        <input
+          type="text"
+          placeholder="Buscar..."
+          class="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          value={search()}
+          onInput={(e) => setSearch(e.currentTarget.value)}
+        />
+        {search() && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+            aria-label="Limpiar búsqueda"
+          >
+            <CloseIcon class="w-4 h-4" />
+          </button>
         )}
+      </div>
+      {operarios.loading && (
+        <div class="text-center py-8">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p class="mt-2 text-gray-600 dark:text-gray-400">
+            Cargando operarios...
+          </p>
+        </div>
+      )}
+      {operarios.error && (
+        <div class="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg mb-4">
+          <p class="text-red-800 dark:text-red-200">
+            Error al cargar operarios: {operarios.error.message}
+          </p>
+        </div>
+      )}
+      {!operarios.loading && !operarios.error && (
+        <div class="border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">
+          {/* Header */}
+          <div
+            class={`grid grid-cols-3 gap-3 px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300 ${theme() === "dark" ? "bg-gray-800" : "bg-gray-100"} border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10`}
+          >
+            <div
+              class="cursor-pointer flex items-center justify-center"
+              onClick={() => handleSort("id")}
+            >
+              <span>ID</span>
+              {SortIconComponent("id")}
+            </div>
+            <div
+              class="cursor-pointer flex items-center justify-center"
+              onClick={() => handleSort("nombre")}
+            >
+              <span>Nombre</span>
+              {SortIconComponent("nombre")}
+            </div>
+            <div
+              class="cursor-pointer flex items-center justify-center"
+              onClick={() => handleSort("gasto_diario")}
+            >
+              <span>Gasto Diario</span>
+              {SortIconComponent("gasto_diario")}
+            </div>
+          </div>
+          {/* Body with scroll */}
+          <div class="max-h-[calc(100vh-300px)] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:hover:scrollbar-thumb-gray-500">
+            <For each={filteredAndSorted()}>
+              {(operario) => (
+                <div
+                  class="grid grid-cols-3 gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer items-center text-center"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleEdit(operario.id);
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    handleDelete(operario.id);
+                  }}
+                >
+                  <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                    {operario.id}
+                  </div>
+                  <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                    {operario.nombre}
+                  </div>
+                  <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                    ${operario.gasto_diario.toLocaleString()}
+                  </div>
+                </div>
+              )}
+            </For>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {showModal() && (
@@ -250,13 +277,13 @@ export default function OperariosPage() {
           <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
             <div class="flex justify-between items-center p-6 border-b dark:border-gray-700">
               <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
-                {editingId() ? 'Editar Operario' : 'Nuevo Operario'}
+                {editingId() ? "Editar Operario" : "Nuevo Operario"}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
                 class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
-<CloseIcon />
+                <CloseIcon />
               </button>
             </div>
             <form onSubmit={handleSubmit} class="p-6 space-y-4">
@@ -269,7 +296,9 @@ export default function OperariosPage() {
                   required
                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   value={formData().nombre}
-                  onInput={(e) => handleInputChange('nombre', e.currentTarget.value)}
+                  onInput={(e) =>
+                    handleInputChange("nombre", e.currentTarget.value)
+                  }
                 />
               </div>
               <div>
@@ -282,14 +311,21 @@ export default function OperariosPage() {
                   required
                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   value={formData().gasto_diario}
-                  onInput={(e) => handleInputChange('gasto_diario', parseFloat(e.currentTarget.value))}
+                  onInput={(e) =>
+                    handleInputChange(
+                      "gasto_diario",
+                      parseFloat(e.currentTarget.value),
+                    )
+                  }
                 />
               </div>
-               {error() && (
-                 <div class="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
-                   <p class="text-sm text-red-800 dark:text-red-200">{error()}</p>
-                 </div>
-               )}
+              {error() && (
+                <div class="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                  <p class="text-sm text-red-800 dark:text-red-200">
+                    {error()}
+                  </p>
+                </div>
+              )}
               <div class="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
@@ -304,7 +340,7 @@ export default function OperariosPage() {
                   class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={loading()}
                 >
-                  {loading() ? 'Guardando...' : 'Guardar'}
+                  {loading() ? "Guardando..." : "Guardar"}
                 </button>
               </div>
             </form>
