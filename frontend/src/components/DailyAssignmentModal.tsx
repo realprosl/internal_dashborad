@@ -6,19 +6,7 @@ import {
   Show,
 } from "solid-js";
 import { CloseIcon } from "./Icons";
-
-type Obra = {
-  id: number;
-  nombre: string;
-  valor_contrato: number;
-  estado: string;
-};
-
-type Operario = {
-  id: number;
-  nombre: string;
-  gasto_diario: number;
-};
+import type { Obra, Operario } from "../types";
 
 type Assignment = {
   obra_id: number;

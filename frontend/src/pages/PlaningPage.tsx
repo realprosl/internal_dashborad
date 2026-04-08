@@ -1,49 +1,26 @@
-import { createResource, For, createSignal, createMemo } from "solid-js";
+import { For, createSignal, createMemo } from "solid-js";
 import { useTheme } from "../contexts/ThemeContext";
+import { useAppStore } from "../store";
 import {
-  SortIcon,
-  SortUpIcon,
-  SortDownIcon,
   CloseIcon,
   CalendarIcon,
 } from "../components/Icons";
 import DailyAssignmentModal from "../components/DailyAssignmentModal";
+import {
+  createSortHandler,
+  createSortIconComponent,
+  createFilterAndSort,
+  type SortDirection,
+} from "../utils";
+import type { Planing } from "../types";
 
-type Planing = {
-  id: number;
-  fecha: string;
-  operario_id: number;
-  obra_id: number;
-  operario_nombre: string;
-  obra_nombre: string;
-};
-
-async function fetchPlanings(): Promise<Planing[]> {
-  const response = await fetch("/api/planings");
-  if (!response.ok) throw new Error("Failed to fetch planings");
-  return response.json();
-}
-
-async function fetchOperarios(): Promise<{ id: number; nombre: string }[]> {
-  const response = await fetch("/api/operarios");
-  if (!response.ok) throw new Error("Failed to fetch operarios");
-  return response.json();
-}
-
-async function fetchObras(): Promise<{ id: number; nombre: string }[]> {
-  const response = await fetch("/api/obras");
-  if (!response.ok) throw new Error("Failed to fetch obras");
-  return response.json();
-}
-
-type SortField = "id" | "fecha" | "operario_nombre" | "obra_nombre";
-type SortDirection = "asc" | "desc";
+type SortField = keyof Planing;
 
 export default function PlaningPage() {
   const { theme } = useTheme();
-  const [planings, { mutate, refetch }] = createResource(fetchPlanings);
-  const [operarios] = createResource(fetchOperarios);
-  const [obras] = createResource(fetchObras);
+  const store = useAppStore();
+
+  // States
   const [search, setSearch] = createSignal("");
   const [sortField, setSortField] = createSignal<SortField>("id");
   const [sortDirection, setSortDirection] = createSignal<SortDirection>("asc");
@@ -51,70 +28,44 @@ export default function PlaningPage() {
   const [showDailyAssignmentModal, setShowDailyAssignmentModal] =
     createSignal(false);
   const [editingId, setEditingId] = createSignal<number | null>(null);
-  const [loading, setLoading] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
   const [formData, setFormData] = createSignal({
     fecha: new Date().toISOString().split("T")[0],
     operario_id: 0,
     obra_id: 0,
   });
 
+  // Computed
   const filteredAndSorted = createMemo(() => {
-    const data = planings() || [];
-    const term = search().toLowerCase();
-    let filtered = term
-      ? data.filter(
-          (p) =>
-            p.operario_nombre.toLowerCase().includes(term) ||
-            p.obra_nombre.toLowerCase().includes(term) ||
-            p.fecha.toLowerCase().includes(term) ||
-            p.id.toString().includes(term),
-        )
-      : data;
-
-    const field = sortField();
-    const dir = sortDirection();
-    return [...filtered].sort((a, b) => {
-      let aVal, bVal;
-      if (field === "fecha") {
-        aVal = new Date(a.fecha).getTime();
-        bVal = new Date(b.fecha).getTime();
-      } else if (field === "id") {
-        aVal = a.id;
-        bVal = b.id;
-      } else if (field === "operario_nombre") {
-        aVal = a.operario_nombre.toLowerCase();
-        bVal = b.operario_nombre.toLowerCase();
-      } else {
-        aVal = a.obra_nombre.toLowerCase();
-        bVal = b.obra_nombre.toLowerCase();
-      }
-      if (aVal < bVal) return dir === "asc" ? -1 : 1;
-      if (aVal > bVal) return dir === "asc" ? 1 : -1;
-      return 0;
+    return createFilterAndSort({
+      data: store.planings || [],
+      searchTerm: search(),
+      sortField: sortField(),
+      sortDirection: sortDirection(),
+      getSortValue: (item: Planing, field: keyof Planing) => {
+        if (field === "fecha") {
+          return new Date(item.fecha).getTime();
+        }
+        const value = item[field];
+        if (typeof value === "string") {
+          return value.toLowerCase();
+        }
+        return value;
+      },
     });
   });
 
-  const handleSort = (field: SortField) => {
-    if (sortField() === field) {
-      setSortDirection(sortDirection() === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
+  // Handlers
+  const handleSort = createSortHandler(
+    sortField,
+    setSortField,
+    sortDirection,
+    setSortDirection,
+  );
 
-  const SortIconComponent = (field: SortField) => {
-    if (sortField() !== field) return <SortIcon class="inline ml-1" />;
-    return sortDirection() === "asc" ? (
-      <SortUpIcon class="inline ml-1" />
-    ) : (
-      <SortDownIcon class="inline ml-1" />
-    );
-  };
+  const SortIconComponent = createSortIconComponent(sortField, sortDirection);
 
   const handleEdit = (id: number) => {
-    const planing = planings()?.find((p) => p.id === id);
+    const planing = store.planings.find((p) => p.id === id);
     if (planing) {
       setEditingId(id);
       setFormData({
@@ -122,20 +73,13 @@ export default function PlaningPage() {
         operario_id: planing.operario_id,
         obra_id: planing.obra_id,
       });
-      setError(null);
       setShowModal(true);
     }
   };
 
   const handleDelete = (id: number) => {
     if (confirm("¿Eliminar este planing?")) {
-      fetch(`/api/planings/${id}`, { method: "DELETE" })
-        .then(() => {
-          mutate((old: Planing[] | undefined) =>
-            old?.filter((p) => p.id !== id),
-          );
-        })
-        .catch(console.error);
+      store.deletePlaning(id);
     }
   };
 
@@ -146,43 +90,37 @@ export default function PlaningPage() {
       operario_id: 0,
       obra_id: 0,
     });
-    setError(null);
     setShowModal(true);
   };
 
-  const handleSubmit = (e: Event) => {
+  const handleSubmit = async (e: Event) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
     const data = formData();
     const id = editingId();
-    const url = id ? `/api/planings/${id}` : "/api/planings";
-    const method = id ? "PUT" : "POST";
-    fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        return res.json();
-      })
-      .then((savedPlaning) => {
-        if (id) {
-          mutate(
-            (old) => old?.map((p) => (p.id === id ? savedPlaning : p)) || [],
-          );
-        } else {
-          mutate((old) => (old ? [...old, savedPlaning] : [savedPlaning]));
-        }
-        setShowModal(false);
-        setEditingId(null);
-      })
-      .catch((err) => {
-        setError(err.message || "Error al guardar");
-        console.error(err);
-      })
-      .finally(() => setLoading(false));
+
+    try {
+      if (id) {
+        // Para edición
+        await store.updatePlaning(id, {
+          fecha: data.fecha,
+          operario_id: data.operario_id,
+          obra_id: data.obra_id,
+        });
+      } else {
+        // Para creación
+        const planingData = {
+          fecha: data.fecha,
+          operario_id: data.operario_id,
+          obra_id: data.obra_id,
+        };
+        await store.addPlaning(planingData);
+      }
+      setShowModal(false);
+      setEditingId(null);
+    } catch (error) {
+      // El error ya está manejado en el store
+      console.error(error);
+    }
   };
 
   const handleBatchSave = async (
@@ -193,9 +131,6 @@ export default function PlaningPage() {
       operario_id: number;
     }[],
   ) => {
-    setLoading(true);
-    setError(null);
-
     try {
       const response = await fetch("/api/planings/batch", {
         method: "POST",
@@ -209,13 +144,10 @@ export default function PlaningPage() {
       }
 
       // Recargar la lista de planings para reflejar los cambios
-      await refetch();
+      await store.fetchPlanings();
       setShowDailyAssignmentModal(false);
     } catch (err: any) {
-      setError(err.message || "Error al guardar las asignaciones");
       throw err; // Re-lanzar para que el modal lo maneje
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -276,7 +208,7 @@ export default function PlaningPage() {
           onSave={handleBatchSave}
         />
       </div>
-      {planings.loading && (
+      {store.loading && (
         <div class="text-center py-8">
           <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <p class="mt-2 text-gray-600 dark:text-gray-400">
@@ -284,14 +216,14 @@ export default function PlaningPage() {
           </p>
         </div>
       )}
-      {planings.error && (
+      {store.error && (
         <div class="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg mb-4">
           <p class="text-red-800 dark:text-red-200">
-            Error al cargar planings: {planings.error.message}
+            Error al cargar planings: {store.error}
           </p>
         </div>
       )}
-      {!planings.loading && !planings.error && (
+      {!store.loading && !store.error && (
         <div class="border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">
           {/* Header */}
           <div
@@ -406,7 +338,7 @@ export default function PlaningPage() {
                   }
                 >
                   <option value="0">Seleccionar operario</option>
-                  {operarios()?.map((op) => (
+                  {store.operarios.map((op) => (
                     <option value={op.id}>{op.nombre}</option>
                   ))}
                 </select>
@@ -427,33 +359,24 @@ export default function PlaningPage() {
                   }
                 >
                   <option value="0">Seleccionar obra</option>
-                  {obras()?.map((ob) => (
+                  {store.obras.map((ob) => (
                     <option value={ob.id}>{ob.nombre}</option>
                   ))}
                 </select>
               </div>
-              {error() && (
-                <div class="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
-                  <p class="text-sm text-red-800 dark:text-red-200">
-                    {error()}
-                  </p>
-                </div>
-              )}
               <div class="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
                   class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                  disabled={loading()}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={loading()}
+                  class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
                 >
-                  {loading() ? "Guardando..." : "Guardar"}
+                  Guardar
                 </button>
               </div>
             </form>

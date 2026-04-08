@@ -1,158 +1,111 @@
-import { createResource, For, createSignal, createMemo } from "solid-js";
+import { For, createSignal, createMemo } from "solid-js";
 import { useTheme } from "../contexts/ThemeContext";
+import { useAppStore } from "../store";
 import {
-  SortIcon,
-  SortUpIcon,
-  SortDownIcon,
   CloseIcon,
   PersonIcon,
 } from "../components/Icons";
+import {
+  createSortHandler,
+  createSortIconComponent,
+  createFilterAndSort,
+  type SortDirection,
+  parseSpanishFloat,
+  formatSpanishFloat,
+  cleanNumericInput,
+} from "../utils";
+import type { Operario } from "../types";
 
-type Operario = {
-  id: number;
-  nombre: string;
-  gasto_diario: number;
-};
-
-async function fetchOperarios(): Promise<Operario[]> {
-  const response = await fetch("/api/operarios");
-  if (!response.ok) throw new Error("Failed to fetch operarios");
-  return response.json();
-}
-
-type SortField = "id" | "nombre" | "gasto_diario";
-type SortDirection = "asc" | "desc";
+type SortField = keyof Operario;
 
 export default function OperariosPage() {
   const { theme } = useTheme();
-  const [operarios, { mutate }] = createResource(fetchOperarios);
+  const store = useAppStore();
+
+  // States
   const [search, setSearch] = createSignal("");
   const [sortField, setSortField] = createSignal<SortField>("id");
   const [sortDirection, setSortDirection] = createSignal<SortDirection>("asc");
   const [showModal, setShowModal] = createSignal(false);
   const [editingId, setEditingId] = createSignal<number | null>(null);
-  const [loading, setLoading] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
   const [formData, setFormData] = createSignal({
     nombre: "",
     gasto_diario: 0,
   });
+  const [gastoDiarioText, setGastoDiarioText] = createSignal("0,00");
 
+  // Computed
   const filteredAndSorted = createMemo(() => {
-    const data = operarios() || [];
-    const term = search().toLowerCase();
-    let filtered = term
-      ? data.filter(
-          (o) =>
-            o.nombre.toLowerCase().includes(term) ||
-            o.id.toString().includes(term) ||
-            o.gasto_diario.toString().includes(term),
-        )
-      : data;
-
-    const field = sortField();
-    const dir = sortDirection();
-    return [...filtered].sort((a, b) => {
-      let aVal, bVal;
-      if (field === "gasto_diario") {
-        aVal = a.gasto_diario;
-        bVal = b.gasto_diario;
-      } else if (field === "id") {
-        aVal = a.id;
-        bVal = b.id;
-      } else {
-        aVal = a.nombre.toLowerCase();
-        bVal = b.nombre.toLowerCase();
-      }
-      if (aVal < bVal) return dir === "asc" ? -1 : 1;
-      if (aVal > bVal) return dir === "asc" ? 1 : -1;
-      return 0;
+    return createFilterAndSort({
+      data: store.operarios,
+      searchTerm: search(),
+      sortField: sortField(),
+      sortDirection: sortDirection(),
     });
   });
 
-  const handleSort = (field: SortField) => {
-    if (sortField() === field) {
-      setSortDirection(sortDirection() === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
+  // Handlers
+  const handleSort = createSortHandler(
+    sortField,
+    setSortField,
+    sortDirection,
+    setSortDirection,
+  );
 
-  const SortIconComponent = (field: SortField) => {
-    if (sortField() !== field) return <SortIcon class="inline ml-1" />;
-    return sortDirection() === "asc" ? (
-      <SortUpIcon class="inline ml-1" />
-    ) : (
-      <SortDownIcon class="inline ml-1" />
-    );
-  };
+  const SortIconComponent = createSortIconComponent(sortField, sortDirection);
 
   const handleEdit = (id: number) => {
-    const operario = operarios()?.find((o) => o.id === id);
+    const operario = store.operarios.find((o) => o.id === id);
     if (operario) {
       setEditingId(id);
       setFormData({
         nombre: operario.nombre,
         gasto_diario: operario.gasto_diario,
       });
-      setError(null);
+      setGastoDiarioText(formatSpanishFloat(operario.gasto_diario));
       setShowModal(true);
     }
   };
 
   const handleDelete = (id: number) => {
     if (confirm("¿Eliminar este operario?")) {
-      fetch(`/api/operarios/${id}`, { method: "DELETE" })
-        .then(() => {
-          mutate((old: Operario[] | undefined) =>
-            old?.filter((o) => o.id !== id),
-          );
-        })
-        .catch(console.error);
+      store.deleteOperario(id);
     }
   };
 
   const handleCreate = () => {
     setEditingId(null);
     setFormData({ nombre: "", gasto_diario: 0 });
-    setError(null);
+    setGastoDiarioText("0,00");
     setShowModal(true);
   };
 
-  const handleSubmit = (e: Event) => {
+  const handleSubmit = async (e: Event) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
     const data = formData();
     const id = editingId();
-    const url = id ? `/api/operarios/${id}` : "/api/operarios";
-    const method = id ? "PUT" : "POST";
-    fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        return res.json();
-      })
-      .then((savedOperario) => {
-        if (id) {
-          mutate(
-            (old) => old?.map((o) => (o.id === id ? savedOperario : o)) || [],
-          );
-        } else {
-          mutate((old) => (old ? [...old, savedOperario] : [savedOperario]));
-        }
-        setShowModal(false);
-        setEditingId(null);
-      })
-      .catch((err) => {
-        setError(err.message || "Error al guardar");
-        console.error(err);
-      })
-      .finally(() => setLoading(false));
+
+    try {
+      if (id) {
+        // Para edición
+        await store.updateOperario(id, {
+          nombre: data.nombre,
+          gasto_diario: data.gasto_diario,
+        });
+      } else {
+        // Para creación
+        const operarioData = {
+          nombre: data.nombre,
+          gasto_diario: data.gasto_diario,
+        };
+        await store.addOperario(operarioData);
+      }
+      setShowModal(false);
+      setEditingId(null);
+    } catch (error) {
+      // El error ya está manejado en el store
+      console.error(error);
+    }
   };
 
   const handleInputChange = (
@@ -197,7 +150,7 @@ export default function OperariosPage() {
           </button>
         )}
       </div>
-      {operarios.loading && (
+      {store.loading && (
         <div class="text-center py-8">
           <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <p class="mt-2 text-gray-600 dark:text-gray-400">
@@ -205,14 +158,14 @@ export default function OperariosPage() {
           </p>
         </div>
       )}
-      {operarios.error && (
+      {store.error && (
         <div class="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg mb-4">
           <p class="text-red-800 dark:text-red-200">
-            Error al cargar operarios: {operarios.error.message}
+            Error al cargar operarios: {store.error}
           </p>
         </div>
       )}
-      {!operarios.loading && !operarios.error && (
+      {!store.loading && !store.error && (
         <div class="border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">
           {/* Header */}
           <div
@@ -236,7 +189,7 @@ export default function OperariosPage() {
               class="cursor-pointer flex items-center justify-center"
               onClick={() => handleSort("gasto_diario")}
             >
-              <span>Gasto Diario</span>
+              <span>Gasto Diario (€)</span>
               {SortIconComponent("gasto_diario")}
             </div>
           </div>
@@ -262,7 +215,7 @@ export default function OperariosPage() {
                     {operario.nombre}
                   </div>
                   <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                    ${operario.gasto_diario.toLocaleString()}
+                    {formatSpanishFloat(operario.gasto_diario)}€
                   </div>
                 </div>
               )}
@@ -303,26 +256,29 @@ export default function OperariosPage() {
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Gasto Diario
+                  Gasto Diario (€)
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputmode="decimal"
                   required
                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  value={formData().gasto_diario}
-                  onInput={(e) =>
-                    handleInputChange(
-                      "gasto_diario",
-                      parseFloat(e.currentTarget.value),
-                    )
-                  }
+                  value={gastoDiarioText()}
+                  onInput={(e) => {
+                    const value = e.currentTarget.value;
+                    const cleaned = cleanNumericInput(value);
+                    setGastoDiarioText(cleaned);
+
+                    // Convertir a número y actualizar formData
+                    const numValue = parseSpanishFloat(cleaned);
+                    handleInputChange("gasto_diario", numValue);
+                  }}
                 />
               </div>
-              {error() && (
+              {store.error && (
                 <div class="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
                   <p class="text-sm text-red-800 dark:text-red-200">
-                    {error()}
+                    {store.error}
                   </p>
                 </div>
               )}
@@ -331,16 +287,16 @@ export default function OperariosPage() {
                   type="button"
                   onClick={() => setShowModal(false)}
                   class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                  disabled={loading()}
+                  disabled={store.loading}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={loading()}
+                  disabled={store.loading}
                 >
-                  {loading() ? "Guardando..." : "Guardar"}
+                  {store.loading ? "Guardando..." : "Guardar"}
                 </button>
               </div>
             </form>

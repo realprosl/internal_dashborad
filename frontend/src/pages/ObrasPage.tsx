@@ -1,102 +1,63 @@
-import { createResource, For, createSignal, createMemo } from "solid-js";
+import { For, createSignal, createMemo } from "solid-js";
 import { useTheme } from "../contexts/ThemeContext";
+import { useAppStore } from "../store";
 import {
-  SortIcon,
-  SortUpIcon,
-  SortDownIcon,
   CloseIcon,
   BuildingIcon,
 } from "../components/Icons";
+import {
+  createSortHandler,
+  createSortIconComponent,
+  createFilterAndSort,
+  type SortDirection,
+  parseSpanishFloat,
+  formatSpanishFloat,
+  cleanNumericInput,
+} from "../utils";
+import type { Obra } from "../types";
 
-type Obra = {
-  id: number;
-  nombre: string;
-  valor_contrato: number;
-  estado: string;
-};
-
-async function fetchObras(): Promise<Obra[]> {
-  const response = await fetch("/api/obras");
-  if (!response.ok) throw new Error("Failed to fetch obras");
-  return response.json();
-}
-
-type SortField = "id" | "nombre" | "valor_contrato" | "estado";
-type SortDirection = "asc" | "desc";
+type SortField = keyof Obra;
 
 export default function ObrasPage() {
   const { theme } = useTheme();
-  const [obras, { mutate }] = createResource(fetchObras);
+  const store = useAppStore();
+
+  // States
   const [search, setSearch] = createSignal("");
   const [sortField, setSortField] = createSignal<SortField>("id");
   const [sortDirection, setSortDirection] = createSignal<SortDirection>("asc");
   const [showModal, setShowModal] = createSignal(false);
   const [editingId, setEditingId] = createSignal<number | null>(null);
-  const [loading, setLoading] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
   const [formData, setFormData] = createSignal({
     id: "",
     nombre: "",
     valor_contrato: 0,
     estado: "activa",
   });
+  const [valorContratoText, setValorContratoText] = createSignal("0,00");
 
+  // Computed
   const filteredAndSorted = createMemo(() => {
-    const data = obras() || [];
-    const term = search().toLowerCase();
-    let filtered = term
-      ? data.filter(
-          (o) =>
-            o.nombre.toLowerCase().includes(term) ||
-            o.estado.toLowerCase().includes(term) ||
-            o.id.toString().includes(term) ||
-            o.valor_contrato.toString().includes(term),
-        )
-      : data;
-
-    const field = sortField();
-    const dir = sortDirection();
-    return [...filtered].sort((a, b) => {
-      let aVal, bVal;
-      if (field === "valor_contrato") {
-        aVal = a.valor_contrato;
-        bVal = b.valor_contrato;
-      } else if (field === "id") {
-        aVal = a.id;
-        bVal = b.id;
-      } else if (field === "nombre") {
-        aVal = a.nombre.toLowerCase();
-        bVal = b.nombre.toLowerCase();
-      } else {
-        aVal = a.estado.toLowerCase();
-        bVal = b.estado.toLowerCase();
-      }
-      if (aVal < bVal) return dir === "asc" ? -1 : 1;
-      if (aVal > bVal) return dir === "asc" ? 1 : -1;
-      return 0;
+    return createFilterAndSort({
+      data: store.obras,
+      searchTerm: search(),
+      sortField: sortField(),
+      sortDirection: sortDirection(),
     });
   });
 
-  const handleSort = (field: SortField) => {
-    if (sortField() === field) {
-      setSortDirection(sortDirection() === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
+  // Handlers
+  const handleSort = createSortHandler(
+    sortField,
+    setSortField,
+    sortDirection,
+    setSortDirection,
+  );
 
-  const SortIconComponent = (field: SortField) => {
-    if (sortField() !== field) return <SortIcon class="inline ml-1" />;
-    return sortDirection() === "asc" ? (
-      <SortUpIcon class="inline ml-1" />
-    ) : (
-      <SortDownIcon class="inline ml-1" />
-    );
-  };
+  const SortIconComponent = createSortIconComponent(sortField, sortDirection);
 
   const handleEdit = (id: number) => {
-    const obra = obras()?.find((o) => o.id === id);
+    const obra = store.obras.find((o) => o.id === id);
     if (obra) {
       setEditingId(id);
       setFormData({
@@ -105,80 +66,61 @@ export default function ObrasPage() {
         valor_contrato: obra.valor_contrato,
         estado: obra.estado,
       });
-      setError(null);
+      setValorContratoText(formatSpanishFloat(obra.valor_contrato));
       setShowModal(true);
     }
   };
 
   const handleDelete = (id: number) => {
     if (confirm("¿Eliminar esta obra?")) {
-      fetch(`/api/obras/${id}`, { method: "DELETE" })
-        .then(() => {
-          mutate((old) => old?.filter((o) => o.id !== id));
-        })
-        .catch(console.error);
+      store.deleteObra(id);
     }
   };
 
   const handleCreate = () => {
     setEditingId(null);
     setFormData({ id: "", nombre: "", valor_contrato: 0, estado: "activa" });
-    setError(null);
+    setValorContratoText("0,00");
     setShowModal(true);
   };
 
-  const handleSubmit = (e: Event) => {
+  const handleSubmit = async (e: Event) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
     const data = formData();
     const id = editingId();
 
-    // Preparar datos para enviar
-    let sendData: any;
-    if (id) {
-      // Para edición: no enviar el ID, el backend usa el ID de la URL
-      sendData = {
-        nombre: data.nombre,
-        valor_contrato: data.valor_contrato,
-        estado: data.estado,
-      };
-    } else {
-      // Para creación: convertir el ID a número si se proporciona
-      const idStr = data.id as string;
-      sendData = {
-        nombre: data.nombre,
-        valor_contrato: data.valor_contrato,
-        estado: data.estado,
-        id: idStr && !isNaN(parseInt(idStr)) ? parseInt(idStr) : 0,
-      };
-    }
+    try {
+      if (id) {
+        // Para edición
+        await store.updateObra(id, {
+          nombre: data.nombre,
+          valor_contrato: data.valor_contrato,
+          estado: data.estado,
+        });
+      } else {
+        // Para creación - solo enviar si hay ID explícito
+        const obraData: any = {
+          nombre: data.nombre,
+          valor_contrato: data.valor_contrato,
+          estado: data.estado,
+        };
 
-    const url = id ? `/api/obras/${id}` : "/api/obras";
-    const method = id ? "PUT" : "POST";
-    fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(sendData),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        return res.json();
-      })
-      .then((savedObra) => {
-        if (id) {
-          mutate((old) => old?.map((o) => (o.id === id ? savedObra : o)) || []);
-        } else {
-          mutate((old) => (old ? [...old, savedObra] : [savedObra]));
+        // Solo incluir ID si se proporcionó explícitamente
+        if (data.id && data.id.trim() !== "") {
+          const parsedId = parseInt(data.id);
+          if (!isNaN(parsedId) && parsedId > 0) {
+            obraData.id = parsedId;
+          }
         }
-        setShowModal(false);
-        setEditingId(null);
-      })
-      .catch((err) => {
-        setError(err.message || "Error al guardar");
-        console.error(err);
-      })
-      .finally(() => setLoading(false));
+
+        await store.addObra(obraData);
+      }
+      setShowModal(false);
+      setEditingId(null);
+    } catch (error) {
+      // El error ya está manejado en el store
+      console.error(error);
+    }
   };
 
   const handleInputChange = (
@@ -223,20 +165,20 @@ export default function ObrasPage() {
           </button>
         )}
       </div>
-      {obras.loading && (
+      {store.loading && (
         <div class="text-center py-8">
           <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <p class="mt-2 text-gray-600 dark:text-gray-400">Cargando obras...</p>
         </div>
       )}
-      {obras.error && (
+      {store.error && (
         <div class="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg mb-4">
           <p class="text-red-800 dark:text-red-200">
-            Error al cargar obras: {obras.error.message}
+            Error al cargar obras: {store.error}
           </p>
         </div>
       )}
-      {!obras.loading && !obras.error && (
+      {!store.loading && !store.error && (
         <div class="border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">
           {/* Header */}
           <div
@@ -260,7 +202,7 @@ export default function ObrasPage() {
               class="cursor-pointer flex items-center justify-center"
               onClick={() => handleSort("valor_contrato")}
             >
-              <span>Valor Contrato</span>
+              <span>Valor Contrato (€)</span>
               {SortIconComponent("valor_contrato")}
             </div>
             <div
@@ -293,7 +235,7 @@ export default function ObrasPage() {
                     {obra.nombre}
                   </div>
                   <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                    ${obra.valor_contrato.toLocaleString()}
+                    {formatSpanishFloat(obra.valor_contrato)}€
                   </div>
                   <div class="flex items-center justify-center whitespace-nowrap">
                     <span
@@ -329,20 +271,20 @@ export default function ObrasPage() {
               </button>
             </div>
             <form onSubmit={handleSubmit} class="p-6 space-y-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Id
-                </label>
-                <input
-                  type="text"
-                  required
-                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  value={formData().id}
-                  onInput={(e) =>
-                    handleInputChange("id", e.currentTarget.value)
-                  }
-                />
-              </div>
+              {editingId() && (
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Id
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    disabled
+                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                    value={formData().id}
+                  />
+                </div>
+              )}
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Nombre
@@ -359,20 +301,23 @@ export default function ObrasPage() {
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Valor Contrato
+                  Valor Contrato (€)
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputmode="decimal"
                   required
                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  value={formData().valor_contrato}
-                  onInput={(e) =>
-                    handleInputChange(
-                      "valor_contrato",
-                      parseFloat(e.currentTarget.value),
-                    )
-                  }
+                  value={valorContratoText()}
+                  onInput={(e) => {
+                    const value = e.currentTarget.value;
+                    const cleaned = cleanNumericInput(value);
+                    setValorContratoText(cleaned);
+
+                    // Convertir a número y actualizar formData
+                    const numValue = parseSpanishFloat(cleaned);
+                    handleInputChange("valor_contrato", numValue);
+                  }}
                 />
               </div>
               <div>
@@ -390,10 +335,10 @@ export default function ObrasPage() {
                   <option value="inactiva">Inactiva</option>
                 </select>
               </div>
-              {error() && (
+              {store.error && (
                 <div class="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
                   <p class="text-sm text-red-800 dark:text-red-200">
-                    {error()}
+                    {store.error}
                   </p>
                 </div>
               )}
@@ -402,16 +347,16 @@ export default function ObrasPage() {
                   type="button"
                   onClick={() => setShowModal(false)}
                   class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                  disabled={loading()}
+                  disabled={store.loading}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={loading()}
+                  disabled={store.loading}
                 >
-                  {loading() ? "Guardando..." : "Guardar"}
+                  {store.loading ? "Guardando..." : "Guardar"}
                 </button>
               </div>
             </form>

@@ -5,10 +5,12 @@ import ObrasPage from './pages/ObrasPage';
 import OperariosPage from './pages/OperariosPage';
 import PlaningPage from './pages/PlaningPage';
 import DashboardPage from './pages/DashboardPage';
+import AppInitializer from './components/AppInitializer';
 
 function App() {
   return (
     <ThemeProvider>
+      <AppInitializer />
       <Router>
         <Route path="/" component={Layout}>
           <Route path="/obras" component={ObrasPage} />
