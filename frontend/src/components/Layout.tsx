@@ -1,7 +1,7 @@
 import { JSX } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
 import { useTheme } from "../contexts/ThemeContext";
-import { SunIcon, MoonIcon } from "./Icons";
+import { SunIcon, MoonIcon, LogoRealpro } from "./Icons";
 
 const navItems = [
   { href: "/obras", label: "Obras" },
@@ -22,6 +22,7 @@ export default function Layout(props: { children?: JSX.Element }) {
           <div class="flex justify-between h-16">
             <div class="flex">
               <div class="flex-shrink-0 flex items-center">
+                <LogoRealpro class="text-blue-600 dark:text-blue-400 w-20 h-20" />
                 <span class="text-xl font-bold text-blue-600 dark:text-blue-400">
                   ProApp
                 </span>
