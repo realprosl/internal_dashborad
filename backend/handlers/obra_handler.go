@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"crud-app/database"
@@ -31,9 +32,9 @@ func (h *ObraHandler) GetObras(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	if estado != "" {
-		rows, err = h.db.Query("SELECT id, nombre, valor_contrato, estado FROM obras WHERE estado = ? ORDER BY id", estado)
+		rows, err = h.db.Query("SELECT id, nombre, valor_contrato, estado, fecha_inicio FROM obras WHERE estado = ? ORDER BY id", estado)
 	} else {
-		rows, err = h.db.Query("SELECT id, nombre, valor_contrato, estado FROM obras ORDER BY id")
+		rows, err = h.db.Query("SELECT id, nombre, valor_contrato, estado, fecha_inicio FROM obras ORDER BY id")
 	}
 
 	if err != nil {
@@ -45,9 +46,13 @@ func (h *ObraHandler) GetObras(w http.ResponseWriter, r *http.Request) {
 	var obras []models.Obra
 	for rows.Next() {
 		var obra models.Obra
-		if err := rows.Scan(&obra.ID, &obra.Nombre, &obra.ValorContrato, &obra.Estado); err != nil {
+		var fechaInicio sql.NullString
+		if err := rows.Scan(&obra.ID, &obra.Nombre, &obra.ValorContrato, &obra.Estado, &fechaInicio); err != nil {
 			h.jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
+		}
+		if fechaInicio.Valid {
+			obra.FechaInicio = fechaInicio.String
 		}
 		obras = append(obras, obra)
 	}
@@ -60,7 +65,8 @@ func (h *ObraHandler) GetObras(w http.ResponseWriter, r *http.Request) {
 
 func (h *ObraHandler) GetObra(w http.ResponseWriter, r *http.Request, id int) {
 	var obra models.Obra
-	err := h.db.QueryRow("SELECT id, nombre, valor_contrato, estado FROM obras WHERE id = ?", id).Scan(&obra.ID, &obra.Nombre, &obra.ValorContrato, &obra.Estado)
+	var fechaInicio sql.NullString
+	err := h.db.QueryRow("SELECT id, nombre, valor_contrato, estado, fecha_inicio FROM obras WHERE id = ?", id).Scan(&obra.ID, &obra.Nombre, &obra.ValorContrato, &obra.Estado, &fechaInicio)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			h.jsonResponse(w, http.StatusNotFound, map[string]string{"error": "Obra no encontrada"})
@@ -68,6 +74,9 @@ func (h *ObraHandler) GetObra(w http.ResponseWriter, r *http.Request, id int) {
 			h.jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 		return
+	}
+	if fechaInicio.Valid {
+		obra.FechaInicio = fechaInicio.String
 	}
 	h.jsonResponse(w, http.StatusOK, obra)
 }
@@ -84,11 +93,11 @@ func (h *ObraHandler) CreateObra(w http.ResponseWriter, r *http.Request) {
 
 	// Si se proporciona un ID, usarlo; de lo contrario, dejar que SQLite genere uno
 	if obra.ID > 0 {
-		result, err = h.db.Exec("INSERT INTO obras (id, nombre, valor_contrato, estado) VALUES (?, ?, ?, ?)",
-			obra.ID, obra.Nombre, obra.ValorContrato, obra.Estado)
+		result, err = h.db.Exec("INSERT INTO obras (id, nombre, valor_contrato, estado, fecha_inicio) VALUES (?, ?, ?, ?, ?)",
+			obra.ID, obra.Nombre, obra.ValorContrato, obra.Estado, obra.FechaInicio)
 	} else {
-		result, err = h.db.Exec("INSERT INTO obras (nombre, valor_contrato, estado) VALUES (?, ?, ?)",
-			obra.Nombre, obra.ValorContrato, obra.Estado)
+		result, err = h.db.Exec("INSERT INTO obras (nombre, valor_contrato, estado, fecha_inicio) VALUES (?, ?, ?, ?)",
+			obra.Nombre, obra.ValorContrato, obra.Estado, obra.FechaInicio)
 	}
 
 	if err != nil {
@@ -102,7 +111,20 @@ func (h *ObraHandler) CreateObra(w http.ResponseWriter, r *http.Request) {
 		obra.ID = int(id)
 	}
 
-	h.jsonResponse(w, http.StatusCreated, obra)
+	// Obtener el registro recién creado de la base de datos
+	var createdObra models.Obra
+	var fechaInicio sql.NullString
+	err = h.db.QueryRow("SELECT id, nombre, valor_contrato, estado, fecha_inicio FROM obras WHERE id = ?", obra.ID).Scan(
+		&createdObra.ID, &createdObra.Nombre, &createdObra.ValorContrato, &createdObra.Estado, &fechaInicio)
+	if err != nil {
+		h.jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if fechaInicio.Valid {
+		createdObra.FechaInicio = fechaInicio.String
+	}
+
+	h.jsonResponse(w, http.StatusCreated, createdObra)
 }
 
 func (h *ObraHandler) UpdateObra(w http.ResponseWriter, r *http.Request, id int) {
@@ -111,14 +133,33 @@ func (h *ObraHandler) UpdateObra(w http.ResponseWriter, r *http.Request, id int)
 		h.jsonResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	_, err := h.db.Exec("UPDATE obras SET nombre = ?, valor_contrato = ?, estado = ? WHERE id = ?",
-		obra.Nombre, obra.ValorContrato, obra.Estado, id)
+
+	// Log para depuración
+	fmt.Printf("UpdateObra - ID: %d, Nombre: %s, FechaInicio: %s\n", id, obra.Nombre, obra.FechaInicio)
+
+	_, err := h.db.Exec("UPDATE obras SET nombre = ?, valor_contrato = ?, estado = ?, fecha_inicio = ? WHERE id = ?",
+		obra.Nombre, obra.ValorContrato, obra.Estado, obra.FechaInicio, id)
 	if err != nil {
+		fmt.Printf("UpdateObra - Error en UPDATE: %v\n", err)
 		h.jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	obra.ID = id
-	h.jsonResponse(w, http.StatusOK, obra)
+	// Obtener el registro actualizado de la base de datos
+	var updatedObra models.Obra
+	var fechaInicio sql.NullString
+	err = h.db.QueryRow("SELECT id, nombre, valor_contrato, estado, fecha_inicio FROM obras WHERE id = ?", id).Scan(
+		&updatedObra.ID, &updatedObra.Nombre, &updatedObra.ValorContrato, &updatedObra.Estado, &fechaInicio)
+	if err != nil {
+		fmt.Printf("UpdateObra - Error en SELECT después de UPDATE: %v\n", err)
+		h.jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if fechaInicio.Valid {
+		updatedObra.FechaInicio = fechaInicio.String
+	}
+
+	fmt.Printf("UpdateObra - Registro actualizado: ID: %d, FechaInicio: %s\n", updatedObra.ID, updatedObra.FechaInicio)
+	h.jsonResponse(w, http.StatusOK, updatedObra)
 }
 
 func (h *ObraHandler) DeleteObra(w http.ResponseWriter, r *http.Request, id int) {

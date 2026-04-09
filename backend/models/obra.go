@@ -5,4 +5,5 @@ type Obra struct {
 	Nombre        string  `db:"nombre" json:"nombre"`
 	ValorContrato float64 `db:"valor_contrato" json:"valor_contrato"`
 	Estado        string  `db:"estado" json:"estado"`
+	FechaInicio   string  `db:"fecha_inicio" json:"fecha_inicio"`
 }
