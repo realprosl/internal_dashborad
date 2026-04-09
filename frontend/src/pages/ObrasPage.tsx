@@ -5,6 +5,7 @@ import {
   CloseIcon,
   BuildingIcon,
 } from "../components/Icons";
+import Notification from "../components/Notification";
 import {
   createSortHandler,
   createSortIconComponent,
@@ -33,8 +34,13 @@ export default function ObrasPage() {
     nombre: "",
     valor_contrato: 0,
     estado: "activa",
+    fecha_inicio: "",
   });
   const [valorContratoText, setValorContratoText] = createSignal("0,00");
+  const [notification, setNotification] = createSignal<{
+    message: string;
+    type: "success" | "error" | "info";
+  } | null>(null);
 
   // Computed
   const filteredAndSorted = createMemo(() => {
@@ -65,21 +71,34 @@ export default function ObrasPage() {
         nombre: obra.nombre,
         valor_contrato: obra.valor_contrato,
         estado: obra.estado,
+        fecha_inicio: obra.fecha_inicio || "",
       });
       setValorContratoText(formatSpanishFloat(obra.valor_contrato));
       setShowModal(true);
     }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (confirm("¿Eliminar esta obra?")) {
-      store.deleteObra(id);
+      try {
+        await store.deleteObra(id);
+        setNotification({
+          message: "Obra eliminada correctamente",
+          type: "success",
+        });
+      } catch (error) {
+        console.error(error);
+        setNotification({
+          message: `Error al eliminar: ${error instanceof Error ? error.message : "Error desconocido"}`,
+          type: "error",
+        });
+      }
     }
   };
 
   const handleCreate = () => {
     setEditingId(null);
-    setFormData({ id: "", nombre: "", valor_contrato: 0, estado: "activa" });
+    setFormData({ id: "", nombre: "", valor_contrato: 0, estado: "activa", fecha_inicio: "" });
     setValorContratoText("0,00");
     setShowModal(true);
   };
@@ -96,6 +115,11 @@ export default function ObrasPage() {
           nombre: data.nombre,
           valor_contrato: data.valor_contrato,
           estado: data.estado,
+          fecha_inicio: data.fecha_inicio,
+        });
+        setNotification({
+          message: "Obra actualizada correctamente",
+          type: "success",
         });
       } else {
         // Para creación - solo enviar si hay ID explícito
@@ -103,6 +127,7 @@ export default function ObrasPage() {
           nombre: data.nombre,
           valor_contrato: data.valor_contrato,
           estado: data.estado,
+          fecha_inicio: data.fecha_inicio,
         };
 
         // Solo incluir ID si se proporcionó explícitamente
@@ -114,12 +139,20 @@ export default function ObrasPage() {
         }
 
         await store.addObra(obraData);
+        setNotification({
+          message: "Obra creada correctamente",
+          type: "success",
+        });
       }
       setShowModal(false);
       setEditingId(null);
     } catch (error) {
       // El error ya está manejado en el store
       console.error(error);
+      setNotification({
+        message: `Error: ${error instanceof Error ? error.message : "Error desconocido"}`,
+        type: "error",
+      });
     }
   };
 
@@ -182,7 +215,7 @@ export default function ObrasPage() {
         <div class="border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">
           {/* Header */}
           <div
-            class={`grid grid-cols-4 gap-3 px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300 ${theme() === "dark" ? "bg-gray-800" : "bg-gray-100"} border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10`}
+            class={`grid grid-cols-5 gap-3 px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300 ${theme() === "dark" ? "bg-gray-800" : "bg-gray-100"} border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10`}
           >
             <div
               class="cursor-pointer flex items-center justify-center"
@@ -212,13 +245,20 @@ export default function ObrasPage() {
               <span>Estado</span>
               {SortIconComponent("estado")}
             </div>
+            <div
+              class="cursor-pointer flex items-center justify-center"
+              onClick={() => handleSort("fecha_inicio")}
+            >
+              <span>Fecha Inicio</span>
+              {SortIconComponent("fecha_inicio")}
+            </div>
           </div>
           {/* Body with scroll */}
           <div class="max-h-[calc(100vh-300px)] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:hover:scrollbar-thumb-gray-500">
             <For each={filteredAndSorted()}>
               {(obra) => (
                 <div
-                  class="grid grid-cols-4 text-center gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer items-center"
+                  class="grid grid-cols-5 text-center gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer items-center"
                   onClick={(e) => {
                     e.preventDefault();
                     handleEdit(obra.id);
@@ -247,6 +287,9 @@ export default function ObrasPage() {
                     >
                       {obra.estado}
                     </span>
+                  </div>
+                  <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                    {obra.fecha_inicio || "-"}
                   </div>
                 </div>
               )}
@@ -335,6 +378,19 @@ export default function ObrasPage() {
                   <option value="inactiva">Inactiva</option>
                 </select>
               </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Fecha Inicio
+                </label>
+                <input
+                  type="date"
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  value={formData().fecha_inicio}
+                  onChange={(e) =>
+                    handleInputChange("fecha_inicio", e.currentTarget.value)
+                  }
+                />
+              </div>
               {store.error && (
                 <div class="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
                   <p class="text-sm text-red-800 dark:text-red-200">
@@ -362,6 +418,15 @@ export default function ObrasPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Notifications */}
+      {notification() && (
+        <Notification
+          message={notification()!.message}
+          type={notification()!.type}
+          onClose={() => setNotification(null)}
+        />
       )}
     </div>
   );

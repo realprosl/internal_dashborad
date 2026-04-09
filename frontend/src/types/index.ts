@@ -3,6 +3,7 @@ export type Obra = {
   nombre: string;
   valor_contrato: number;
   estado: string;
+  fecha_inicio: string;
 };
 
 export type Operario = {

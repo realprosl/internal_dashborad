@@ -101,9 +101,12 @@ const addObra = async (obraData: Omit<Obra, 'id'>) => {
     const newObra = await response.json();
     setStore('obras', [...store.obras, newObra]);
     setStore('loading', false);
+    return newObra;
   } catch (error) {
-    setStore('error', error instanceof Error ? error.message : 'Error adding obra');
+    const errorMsg = error instanceof Error ? error.message : 'Error adding obra';
+    setStore('error', errorMsg);
     setStore('loading', false);
+    throw new Error(errorMsg);
   }
 };
 
@@ -126,9 +129,12 @@ const updateObra = async (id: number, obraData: Partial<Obra>) => {
     }
 
     setStore('loading', false);
+    return updatedObra;
   } catch (error) {
-    setStore('error', error instanceof Error ? error.message : 'Error updating obra');
+    const errorMsg = error instanceof Error ? error.message : 'Error updating obra';
+    setStore('error', errorMsg);
     setStore('loading', false);
+    throw new Error(errorMsg);
   }
 };
 
@@ -140,9 +146,12 @@ const deleteObra = async (id: number) => {
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     setStore('obras', store.obras.filter(o => o.id !== id));
     setStore('loading', false);
+    return true;
   } catch (error) {
-    setStore('error', error instanceof Error ? error.message : 'Error deleting obra');
+    const errorMsg = error instanceof Error ? error.message : 'Error deleting obra';
+    setStore('error', errorMsg);
     setStore('loading', false);
+    throw new Error(errorMsg);
   }
 };
 
