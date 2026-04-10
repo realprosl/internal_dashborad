@@ -31,6 +31,7 @@ export default function OperariosPage() {
   const [formData, setFormData] = createSignal({
     nombre: "",
     gasto_diario: 0,
+    estado: "activo",
   });
   const [gastoDiarioText, setGastoDiarioText] = createSignal("0,00");
 
@@ -61,6 +62,7 @@ export default function OperariosPage() {
       setFormData({
         nombre: operario.nombre,
         gasto_diario: operario.gasto_diario,
+        estado: operario.estado,
       });
       setGastoDiarioText(formatSpanishFloat(operario.gasto_diario));
       setShowModal(true);
@@ -75,7 +77,7 @@ export default function OperariosPage() {
 
   const handleCreate = () => {
     setEditingId(null);
-    setFormData({ nombre: "", gasto_diario: 0 });
+    setFormData({ nombre: "", gasto_diario: 0, estado: "activo" });
     setGastoDiarioText("0,00");
     setShowModal(true);
   };
@@ -91,12 +93,14 @@ export default function OperariosPage() {
         await store.updateOperario(id, {
           nombre: data.nombre,
           gasto_diario: data.gasto_diario,
+          estado: data.estado,
         });
       } else {
         // Para creación
         const operarioData = {
           nombre: data.nombre,
           gasto_diario: data.gasto_diario,
+          estado: data.estado,
         };
         await store.addOperario(operarioData);
       }
@@ -169,7 +173,7 @@ export default function OperariosPage() {
         <div class="border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">
           {/* Header */}
           <div
-            class={`grid grid-cols-3 gap-3 px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300 ${theme() === "dark" ? "bg-gray-800" : "bg-gray-100"} border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10`}
+            class={`grid grid-cols-4 gap-3 px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300 ${theme() === "dark" ? "bg-gray-800" : "bg-gray-100"} border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10`}
           >
             <div
               class="cursor-pointer flex items-center justify-center"
@@ -192,13 +196,20 @@ export default function OperariosPage() {
               <span>Gasto Diario (€)</span>
               {SortIconComponent("gasto_diario")}
             </div>
+            <div
+              class="cursor-pointer flex items-center justify-center"
+              onClick={() => handleSort("estado")}
+            >
+              <span>Estado</span>
+              {SortIconComponent("estado")}
+            </div>
           </div>
           {/* Body with scroll */}
           <div class="max-h-[calc(100vh-300px)] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:hover:scrollbar-thumb-gray-500">
             <For each={filteredAndSorted()}>
               {(operario) => (
                 <div
-                  class="grid grid-cols-3 gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer items-center text-center"
+                  class="grid grid-cols-4 gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer items-center text-center"
                   onClick={(e) => {
                     e.preventDefault();
                     handleEdit(operario.id);
@@ -216,6 +227,15 @@ export default function OperariosPage() {
                   </div>
                   <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
                     {formatSpanishFloat(operario.gasto_diario)}€
+                  </div>
+                  <div class="flex items-center justify-center text-sm whitespace-nowrap">
+                    <span class={`px-2 py-1 rounded-full text-xs font-medium ${
+                      operario.estado === "activo"
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                    }`}>
+                      {operario.estado === "activo" ? "Activo" : "Inactivo"}
+                    </span>
                   </div>
                 </div>
               )}
@@ -274,6 +294,21 @@ export default function OperariosPage() {
                     handleInputChange("gasto_diario", numValue);
                   }}
                 />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Estado
+                </label>
+                <select
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  value={formData().estado}
+                  onChange={(e) =>
+                    handleInputChange("estado", e.currentTarget.value)
+                  }
+                >
+                  <option value="activo">Activo</option>
+                  <option value="inactivo">Inactivo</option>
+                </select>
               </div>
               {store.error && (
                 <div class="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">

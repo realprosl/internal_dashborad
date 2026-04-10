@@ -26,7 +26,19 @@ func (h *OperarioHandler) jsonResponse(w http.ResponseWriter, status int, data i
 }
 
 func (h *OperarioHandler) GetOperarios(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.db.Query("SELECT id, nombre, gasto_diario FROM operarios ORDER BY id")
+	estado := r.URL.Query().Get("estado")
+
+	var query string
+	var args []interface{}
+
+	if estado != "" {
+		query = "SELECT id, nombre, gasto_diario, estado FROM operarios WHERE estado = ? ORDER BY id"
+		args = append(args, estado)
+	} else {
+		query = "SELECT id, nombre, gasto_diario, estado FROM operarios ORDER BY id"
+	}
+
+	rows, err := h.db.Query(query, args...)
 	if err != nil {
 		h.jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -36,7 +48,7 @@ func (h *OperarioHandler) GetOperarios(w http.ResponseWriter, r *http.Request) {
 	var operarios []models.Operario
 	for rows.Next() {
 		var operario models.Operario
-		if err := rows.Scan(&operario.ID, &operario.Nombre, &operario.GastoDiario); err != nil {
+		if err := rows.Scan(&operario.ID, &operario.Nombre, &operario.GastoDiario, &operario.Estado); err != nil {
 			h.jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -51,7 +63,7 @@ func (h *OperarioHandler) GetOperarios(w http.ResponseWriter, r *http.Request) {
 
 func (h *OperarioHandler) GetOperario(w http.ResponseWriter, r *http.Request, id int) {
 	var operario models.Operario
-	err := h.db.QueryRow("SELECT id, nombre, gasto_diario FROM operarios WHERE id = ?", id).Scan(&operario.ID, &operario.Nombre, &operario.GastoDiario)
+	err := h.db.QueryRow("SELECT id, nombre, gasto_diario, estado FROM operarios WHERE id = ?", id).Scan(&operario.ID, &operario.Nombre, &operario.GastoDiario, &operario.Estado)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			h.jsonResponse(w, http.StatusNotFound, map[string]string{"error": "Operario no encontrado"})
@@ -69,8 +81,8 @@ func (h *OperarioHandler) CreateOperario(w http.ResponseWriter, r *http.Request)
 		h.jsonResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	result, err := h.db.Exec("INSERT INTO operarios (nombre, gasto_diario) VALUES (?, ?)",
-		operario.Nombre, operario.GastoDiario)
+	result, err := h.db.Exec("INSERT INTO operarios (nombre, gasto_diario, estado) VALUES (?, ?, ?)",
+		operario.Nombre, operario.GastoDiario, operario.Estado)
 	if err != nil {
 		h.jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -86,8 +98,8 @@ func (h *OperarioHandler) UpdateOperario(w http.ResponseWriter, r *http.Request,
 		h.jsonResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	_, err := h.db.Exec("UPDATE operarios SET nombre = ?, gasto_diario = ? WHERE id = ?",
-		operario.Nombre, operario.GastoDiario, id)
+	_, err := h.db.Exec("UPDATE operarios SET nombre = ?, gasto_diario = ?, estado = ? WHERE id = ?",
+		operario.Nombre, operario.GastoDiario, operario.Estado, id)
 	if err != nil {
 		h.jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return

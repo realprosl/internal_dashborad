@@ -32,9 +32,9 @@ async function fetchObrasActivas(): Promise<Obra[]> {
   return response.json();
 }
 
-// Fetch todos los operarios
+// Fetch operarios activos
 async function fetchOperarios(): Promise<Operario[]> {
-  const response = await fetch("/api/operarios");
+  const response = await fetch("/api/operarios?estado=activo");
   if (!response.ok) throw new Error("Failed to fetch operarios");
   return response.json();
 }

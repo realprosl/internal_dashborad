@@ -10,6 +10,7 @@ export type Operario = {
   id: number;
   nombre: string;
   gasto_diario: number;
+  estado: string;
 };
 
 export type Planing = {
