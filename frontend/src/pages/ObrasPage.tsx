@@ -25,6 +25,7 @@ export default function ObrasPage() {
 
   // States
   const [search, setSearch] = createSignal("");
+  const [estadoFilter, setEstadoFilter] = createSignal<string>("");
   const [sortField, setSortField] = createSignal<SortField>("id");
   const [sortDirection, setSortDirection] = createSignal<SortDirection>("asc");
   const [showModal, setShowModal] = createSignal(false);
@@ -44,8 +45,17 @@ export default function ObrasPage() {
 
   // Computed
   const filteredAndSorted = createMemo(() => {
+    let filtered = store.obras;
+
+    // Aplicar filtro por estado si está seleccionado
+    const estado = estadoFilter();
+    if (estado) {
+      filtered = filtered.filter(obra => obra.estado === estado);
+    }
+
+    // Aplicar búsqueda y ordenamiento
     return createFilterAndSort({
-      data: store.obras,
+      data: filtered,
       searchTerm: search(),
       sortField: sortField(),
       sortDirection: sortDirection(),
@@ -179,24 +189,38 @@ export default function ObrasPage() {
           Nueva Obra
         </button>
       </div>
-      <div class="mb-6 relative">
-        <input
-          type="text"
-          placeholder="Buscar..."
-          class="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          value={search()}
-          onInput={(e) => setSearch(e.currentTarget.value)}
-        />
-        {search() && (
-          <button
-            type="button"
-            onClick={() => setSearch("")}
-            class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-            aria-label="Limpiar búsqueda"
+      <div class="mb-6 flex flex-col sm:flex-row gap-4">
+        <div class="relative flex-grow">
+          <input
+            type="text"
+            placeholder="Buscar por nombre..."
+            class="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            value={search()}
+            onInput={(e) => setSearch(e.currentTarget.value)}
+          />
+          {search() && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              aria-label="Limpiar búsqueda"
+            >
+              <CloseIcon class="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        <div class="w-full sm:w-48">
+          <select
+            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            value={estadoFilter()}
+            onChange={(e) => setEstadoFilter(e.currentTarget.value)}
           >
-            <CloseIcon class="w-4 h-4" />
-          </button>
-        )}
+            <option value="">Todos los estados</option>
+            <option value="activa">Activa</option>
+            <option value="inactiva">Inactiva</option>
+            <option value="terminada">Terminada</option>
+          </select>
+        </div>
       </div>
       {store.loading && (
         <div class="text-center py-8">
@@ -282,7 +306,9 @@ export default function ObrasPage() {
                       class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         obra.estado === "activa"
                           ? "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100"
-                          : "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100"
+                          : obra.estado === "inactiva"
+                          ? "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100"
+                          : "bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100"
                       }`}
                     >
                       {obra.estado}
@@ -376,6 +402,7 @@ export default function ObrasPage() {
                 >
                   <option value="activa">Activa</option>
                   <option value="inactiva">Inactiva</option>
+                  <option value="terminada">Terminada</option>
                 </select>
               </div>
               <div>
