@@ -21,3 +21,15 @@ export type Planing = {
   operario_nombre?: string;
   obra_nombre?: string;
 };
+
+export type Material = {
+  id: number;
+  fecha: string;
+  obra_id: number;
+  descripcion: string;
+  precio: number;
+  unidad: string;
+  unidades: number;
+  estado: string;
+  obra_nombre?: string;
+};

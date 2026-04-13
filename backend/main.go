@@ -57,6 +57,7 @@ func main() {
 	obraHandler := handlers.NewObraHandler()
 	operarioHandler := handlers.NewOperarioHandler()
 	planingHandler := handlers.NewPlaningHandler()
+	materialHandler := handlers.NewMaterialHandler()
 
 	mux := http.NewServeMux()
 
@@ -172,6 +173,37 @@ func main() {
 			return
 		}
 		planingHandler.BatchUpdatePlanings(w, r)
+	})
+
+	// Rutas para Materiales
+	mux.HandleFunc("/api/materiales", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			materialHandler.GetMateriales(w, r)
+		case http.MethodPost:
+			materialHandler.CreateMaterial(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc("/api/materiales/", func(w http.ResponseWriter, r *http.Request) {
+		id, ok := parseIDFromPath(r.URL.Path, "/api/materiales/")
+		if !ok {
+			http.Error(w, "Invalid ID", http.StatusBadRequest)
+			return
+		}
+
+		switch r.Method {
+		case http.MethodGet:
+			materialHandler.GetMaterial(w, r, id)
+		case http.MethodPut:
+			materialHandler.UpdateMaterial(w, r, id)
+		case http.MethodDelete:
+			materialHandler.DeleteMaterial(w, r, id)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
 	})
 
 	// Servir archivos estáticos del frontend

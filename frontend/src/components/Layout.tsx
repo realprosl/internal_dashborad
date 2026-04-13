@@ -7,6 +7,7 @@ const navItems = [
   { href: "/obras", label: "Obras" },
   { href: "/operarios", label: "Operarios" },
   { href: "/planing", label: "Planing" },
+  { href: "/materiales", label: "Materiales" },
 ];
 
 export default function Layout(props: { children?: JSX.Element }) {

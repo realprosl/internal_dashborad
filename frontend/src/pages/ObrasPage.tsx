@@ -1,10 +1,7 @@
 import { For, createSignal, createMemo } from "solid-js";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAppStore } from "../store";
-import {
-  CloseIcon,
-  BuildingIcon,
-} from "../components/Icons";
+import { CloseIcon, BuildingIcon } from "../components/Icons";
 import Notification from "../components/Notification";
 import {
   createSortHandler,
@@ -16,6 +13,8 @@ import {
   cleanNumericInput,
 } from "../utils";
 import type { Obra } from "../types";
+
+import { GridTable } from "../components/GridTable";
 
 type SortField = keyof Obra;
 
@@ -50,7 +49,7 @@ export default function ObrasPage() {
     // Aplicar filtro por estado si está seleccionado
     const estado = estadoFilter();
     if (estado) {
-      filtered = filtered.filter(obra => obra.estado === estado);
+      filtered = filtered.filter((obra) => obra.estado === estado);
     }
 
     // Aplicar búsqueda y ordenamiento
@@ -108,7 +107,13 @@ export default function ObrasPage() {
 
   const handleCreate = () => {
     setEditingId(null);
-    setFormData({ id: "", nombre: "", valor_contrato: 0, estado: "activa", fecha_inicio: "" });
+    setFormData({
+      id: "",
+      nombre: "",
+      valor_contrato: 0,
+      estado: "activa",
+      fecha_inicio: "",
+    });
     setValorContratoText("0,00");
     setShowModal(true);
   };
@@ -307,8 +312,8 @@ export default function ObrasPage() {
                         obra.estado === "activa"
                           ? "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100"
                           : obra.estado === "inactiva"
-                          ? "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100"
-                          : "bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100"
+                            ? "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100"
+                            : "bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100"
                       }`}
                     >
                       {obra.estado}
@@ -323,6 +328,31 @@ export default function ObrasPage() {
           </div>
         </div>
       )}
+
+      <GridTable
+        data={store.obras}
+        filter={search}
+        gap={6}
+        sortable={true}
+        template="grid-cols-[3fr_1fr_4fr_1fr_1fr]"
+        class="border border-gray-600 rounded-md"
+        headerClass="bg-gray-800 rounded-md uppercase "
+        rowClass="text-gray-300 text-center hover:bg-gray-800"
+        headers={[
+          { label: <div>Fecha</div>, key: "fecha_inicio" },
+          { label: <div>ID</div>, key: "id" },
+          { label: <div>Nombre</div>, key: "nombre" },
+          { label: <div>Gasto</div>, key: "valor_contrato" },
+          { label: <div>Estado</div>, key: "estado" },
+        ]}
+        rows={(row, index) => [
+          <div>{row.fecha_inicio}</div>,
+          <div>{row.id}</div>,
+          <div class="text-left">{row.nombre}</div>,
+          <div class="text-right">{row.valor_contrato}</div>,
+          <div>{row.estado}</div>,
+        ]}
+      />
 
       {/* Modal */}
       {showModal() && (
