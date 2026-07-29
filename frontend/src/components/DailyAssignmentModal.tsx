@@ -2,6 +2,9 @@ import {
   createSignal,
   createResource,
   createEffect,
+  createMemo,
+  onMount,
+  onCleanup,
   For,
   Show,
 } from "solid-js";
@@ -164,6 +167,45 @@ export default function DailyAssignmentModal(props: DailyAssignmentModalProps) {
 
   const hasChanges = () => pendingChanges().length > 0;
 
+// ── Layout adaptativo ──────────────────────────────────────────────────
+// Ancho de cada columna de operario se calcula para que la tabla quepa en
+// pantalla siempre que sea posible. Si hay tantos operarios que el ancho
+// mínimo (50px) no entra, se activa el scroll horizontal.
+
+const MIN_COL = 50; // ancho mínimo por columna (px)
+const MAX_COL = 160; // ancho máximo por columna (px)
+const OBRA_COL = 220; // columna fija de la izquierda
+const MODAL_MAX = 1600; // máximo del modal (debe casar con Layout)
+
+const [viewportWidth, setViewportWidth] = createSignal(
+  typeof window !== "undefined" ? window.innerWidth : MODAL_MAX,
+);
+
+onMount(() => {
+  const onResize = () => setViewportWidth(window.innerWidth);
+  window.addEventListener("resize", onResize);
+  onCleanup(() => window.removeEventListener("resize", onResize));
+});
+
+// Ancho calculado: divide el espacio disponible entre operarios, con clamp.
+const operarioColWidth = createMemo(() => {
+  const ops = operarios()?.length ?? 0;
+  if (ops === 0) return MAX_COL;
+  const modalSpace = Math.min(MODAL_MAX, viewportWidth()) - 48; // padding + margen modal
+  const remaining = modalSpace - OBRA_COL - 24;
+  const ideal = Math.floor(remaining / ops);
+  return Math.max(MIN_COL, Math.min(MAX_COL, ideal));
+});
+
+// true si aún con columnas al mínimo no caben → activar scroll.
+const needsHorizontalScroll = createMemo(() => {
+  const ops = operarios()?.length ?? 0;
+  if (ops === 0) return false;
+  const totalRequired = OBRA_COL + ops * MIN_COL + 24;
+  const modalSpace = Math.min(MODAL_MAX, viewportWidth()) - 48;
+  return totalRequired > modalSpace;
+});
+
   return (
     <Show when={props.show}>
       <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -216,18 +258,33 @@ export default function DailyAssignmentModal(props: DailyAssignmentModalProps) {
               >
                 <Show when={obrasActivas() && operarios()}>
                   <div class="flex-1 overflow-hidden">
-                    <div class="h-full overflow-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:hover:scrollbar-thumb-gray-500">
-                      <table class="min-w-full border-collapse table-fixed">
+                    <div
+                      class="h-full scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:hover:scrollbar-thumb-gray-500"
+                      classList={{ "overflow-auto": true }}
+                    >
+                      <Show when={needsHorizontalScroll()}>
+                        <div class="px-3 py-1 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+                          Hay {operarios()!.length} operarios — no caben todos.
+                          Desplaza horizontalmente para ver el resto →
+                        </div>
+                      </Show>
+                      <table class="border-collapse w-full">
                         {" "}
                         <thead class="sticky top-0 bg-white dark:bg-gray-800 z-10">
                           <tr>
-                            <th class="sticky left-0 bg-white dark:bg-gray-800 p-2 border-b border-r border-gray-300 dark:border-gray-700 text-left font-semibold text-gray-700 dark:text-gray-300 min-w-max text-sm">
-                              Obras \ Operarios
+                            <th
+                              class="sticky left-0 bg-white dark:bg-gray-800 p-2 border-b border-r border-gray-300 dark:border-gray-700 text-left font-semibold text-gray-700 dark:text-gray-300 text-sm"
+                              style={{ "min-width": OBRA_COL + "px", "max-width": OBRA_COL + "px" }}
+                            >
+                              <div class="truncate">Obras \ Operarios</div>
                             </th>
 
                             <For each={operarios()}>
                               {(operario) => (
-                                <th class="p-2 border-b border-gray-300 dark:border-gray-700 text-center font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-[70px] max-w-[100px] text-xs">
+                                <th
+                                  class="p-2 border-b border-gray-300 dark:border-gray-700 text-center font-medium text-gray-700 dark:text-gray-300 text-xs"
+                                  style={{ "min-width": operarioColWidth() + "px" }}
+                                >
                                   <div class="truncate" title={operario.nombre}>
                                     {operario.nombre}
                                   </div>
@@ -242,8 +299,11 @@ export default function DailyAssignmentModal(props: DailyAssignmentModalProps) {
                               <tr
                                 class={`hover:bg-gray-50 dark:hover:bg-gray-800/50 ${index() % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-gray-50 dark:bg-gray-800/70"}`}
                               >
-                                <td class="sticky left-0 p-2 border-b border-r border-gray-300 dark:border-gray-700 font-medium text-gray-900 dark:text-white whitespace-nowrap text-sm min-w-max">
-                                  <div title={obra.nombre}>
+                                <td
+                                  class="sticky left-0 p-2 border-b border-r border-gray-300 dark:border-gray-700 font-medium text-gray-900 dark:text-white text-sm bg-inherit"
+                                  style={{ "min-width": OBRA_COL + "px", "max-width": OBRA_COL + "px" }}
+                                >
+                                  <div class="truncate" title={obra.nombre}>
                                     {obra.id + ". " + obra.nombre}
                                   </div>
                                 </td>
@@ -251,13 +311,14 @@ export default function DailyAssignmentModal(props: DailyAssignmentModalProps) {
                                 <For each={operarios()}>
                                   {(operario) => (
                                     <td
-                                      class={`p-1 border-b border-gray-300 dark:border-gray-700 cursor-pointer transition-all duration-200 ${
+                                      class={`p-1 border-b border-gray-300 dark:border-gray-700 cursor-pointer transition-all duration-200 text-center ${
                                         isAssigned(obra.id, operario.id)
                                           ? "bg-green-500 hover:bg-green-600 text-white"
                                           : index() % 2 === 0
                                             ? "bg-white hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700"
                                             : "bg-gray-50 hover:bg-gray-200 dark:bg-gray-800/70 dark:hover:bg-gray-600"
                                       }`}
+                                      style={{ "min-width": operarioColWidth() + "px" }}
                                       onClick={() =>
                                         toggleAssignment(obra.id, operario.id)
                                       }

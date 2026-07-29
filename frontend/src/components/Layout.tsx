@@ -188,7 +188,7 @@ export default function Layout(props: { children?: JSX.Element }) {
           </div>
         </div>
       </nav>
-      <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      <main class="max-w-[1600px] mx-auto py-6 sm:px-6 lg:px-8">
         {props.children}
       </main>
     </div>

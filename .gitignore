@@ -117,6 +117,8 @@ shrinkwrap.json
 # Database files (SQLite)
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 planing.db
 
 # Custom
