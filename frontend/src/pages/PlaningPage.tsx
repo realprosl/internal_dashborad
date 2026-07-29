@@ -12,6 +12,7 @@ import {
   createFilterAndSort,
   type SortDirection,
 } from "../utils";
+import { apiUrl } from "../config";
 import type { Planing } from "../types";
 
 type SortField = keyof Planing;
@@ -132,7 +133,7 @@ export default function PlaningPage() {
     }[],
   ) => {
     try {
-      const response = await fetch("/api/planings/batch", {
+      const response = await fetch(apiUrl("/api/planings/batch"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fecha, operations }),

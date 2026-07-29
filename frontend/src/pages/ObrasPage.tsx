@@ -14,8 +14,6 @@ import {
 } from "../utils";
 import type { Obra } from "../types";
 
-import { GridTable } from "../components/GridTable";
-
 type SortField = keyof Obra;
 
 export default function ObrasPage() {
@@ -329,31 +327,6 @@ export default function ObrasPage() {
         </div>
       )}
 
-      <GridTable
-        data={store.obras}
-        filter={search}
-        gap={6}
-        sortable={true}
-        template="grid-cols-[3fr_1fr_4fr_1fr_1fr]"
-        class="border border-gray-600 rounded-md"
-        headerClass="bg-gray-800 rounded-md uppercase "
-        rowClass="text-gray-300 text-center hover:bg-gray-800"
-        headers={[
-          { label: <div>Fecha</div>, key: "fecha_inicio" },
-          { label: <div>ID</div>, key: "id" },
-          { label: <div>Nombre</div>, key: "nombre" },
-          { label: <div>Gasto</div>, key: "valor_contrato" },
-          { label: <div>Estado</div>, key: "estado" },
-        ]}
-        rows={(row, index) => [
-          <div>{row.fecha_inicio}</div>,
-          <div>{row.id}</div>,
-          <div class="text-left">{row.nombre}</div>,
-          <div class="text-right">{row.valor_contrato}</div>,
-          <div>{row.estado}</div>,
-        ]}
-      />
-
       {/* Modal */}
       {showModal() && (
         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -370,20 +343,32 @@ export default function ObrasPage() {
               </button>
             </div>
             <form onSubmit={handleSubmit} class="p-6 space-y-4">
-              {editingId() && (
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Id
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    disabled
-                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-                    value={formData().id}
-                  />
-                </div>
-              )}
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Id
+                  {!editingId() && (
+                    <span class="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
+                      (opcional — auto-asignado si se deja vacío)
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  disabled={!!editingId()}
+                  placeholder={editingId() ? "" : "ej. 3855"}
+                  class={
+                    editingId()
+                      ? "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                      : "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  }
+                  value={formData().id}
+                  onInput={(e) => {
+                    const cleaned = e.currentTarget.value.replace(/[^\d]/g, "");
+                    handleInputChange("id", cleaned);
+                  }}
+                />
+              </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Nombre

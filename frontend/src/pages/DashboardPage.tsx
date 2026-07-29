@@ -1,23 +1,24 @@
 import { createResource, For } from 'solid-js';
 import { DashboardIcon } from '../components/Icons';
+import { apiUrl } from '../config';
 
 
 async function fetchObrasCount(): Promise<number> {
-  const response = await fetch('/api/obras');
+  const response = await fetch(apiUrl('/api/obras'));
   if (!response.ok) throw new Error('Failed to fetch obras count');
   const data = await response.json();
   return data.length;
 }
 
 async function fetchOperariosCount(): Promise<number> {
-  const response = await fetch('/api/operarios');
+  const response = await fetch(apiUrl('/api/operarios'));
   if (!response.ok) throw new Error('Failed to fetch operarios count');
   const data = await response.json();
   return data.length;
 }
 
 async function fetchPlaningsCount(): Promise<number> {
-  const response = await fetch('/api/planings');
+  const response = await fetch(apiUrl('/api/planings'));
   if (!response.ok) throw new Error('Failed to fetch planings count');
   const data = await response.json();
   return data.length;

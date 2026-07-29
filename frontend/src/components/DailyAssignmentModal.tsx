@@ -6,6 +6,7 @@ import {
   Show,
 } from "solid-js";
 import { CloseIcon } from "./Icons";
+import { apiUrl } from "../config";
 import type { Obra, Operario } from "../types";
 
 type Assignment = {
@@ -27,21 +28,21 @@ interface DailyAssignmentModalProps {
 
 // Fetch obras activas (estado = 'activa')
 async function fetchObrasActivas(): Promise<Obra[]> {
-  const response = await fetch("/api/obras?estado=activa");
+  const response = await fetch(apiUrl("/api/obras?estado=activa"));
   if (!response.ok) throw new Error("Failed to fetch obras activas");
   return response.json();
 }
 
 // Fetch operarios activos
 async function fetchOperarios(): Promise<Operario[]> {
-  const response = await fetch("/api/operarios?estado=activo");
+  const response = await fetch(apiUrl("/api/operarios?estado=activo"));
   if (!response.ok) throw new Error("Failed to fetch operarios");
   return response.json();
 }
 
 // Fetch asignaciones para una fecha específica
 async function fetchAssignmentsByDate(fecha: string): Promise<Assignment[]> {
-  const response = await fetch(`/api/planings/date/${fecha}`);
+  const response = await fetch(apiUrl(`/api/planings/date/${fecha}`));
   if (!response.ok) {
     if (response.status === 404) {
       // No hay asignaciones para esta fecha, devolver array vacío

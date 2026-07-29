@@ -1,5 +1,6 @@
 import { createStore } from 'solid-js/store';
 import type { Obra, Operario, Planing, Material } from '../types';
+import { apiUrl } from '../config';
 
 // Create the store
 const [store, setStore] = createStore({
@@ -17,7 +18,7 @@ const fetchObras = async () => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch('/api/obras');
+    const response = await fetch(apiUrl('/api/obras'));
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     const obras = await response.json();
     setStore('obras', obras);
@@ -32,7 +33,7 @@ const fetchOperarios = async () => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch('/api/operarios');
+    const response = await fetch(apiUrl('/api/operarios'));
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     const operarios = await response.json();
     setStore('operarios', operarios);
@@ -47,7 +48,7 @@ const fetchPlanings = async () => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch('/api/planings');
+    const response = await fetch(apiUrl('/api/planings'));
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     const planings = await response.json();
     setStore('planings', planings);
@@ -62,7 +63,7 @@ const fetchMateriales = async () => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch('/api/materiales');
+    const response = await fetch(apiUrl('/api/materiales'));
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     const materiales = await response.json();
     setStore('materiales', materiales);
@@ -78,10 +79,10 @@ const fetchAll = async () => {
   setStore('error', null);
   try {
     const [obrasRes, operariosRes, planingsRes, materialesRes] = await Promise.all([
-      fetch('/api/obras'),
-      fetch('/api/operarios'),
-      fetch('/api/planings'),
-      fetch('/api/materiales')
+      fetch(apiUrl('/api/obras')),
+      fetch(apiUrl('/api/operarios')),
+      fetch(apiUrl('/api/planings')),
+      fetch(apiUrl('/api/materiales'))
     ]);
 
     if (!obrasRes.ok) throw new Error(`HTTP ${obrasRes.status}: Error fetching obras`);
@@ -112,7 +113,7 @@ const addObra = async (obraData: Omit<Obra, 'id'>) => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch('/api/obras', {
+    const response = await fetch(apiUrl('/api/obras'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(obraData)
@@ -134,7 +135,7 @@ const updateObra = async (id: number, obraData: Partial<Obra>) => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(`/api/obras/${id}`, {
+    const response = await fetch(apiUrl(`/api/obras/${id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(obraData)
@@ -162,7 +163,7 @@ const deleteObra = async (id: number) => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(`/api/obras/${id}`, { method: 'DELETE' });
+    const response = await fetch(apiUrl(`/api/obras/${id}`), { method: 'DELETE' });
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     setStore('obras', store.obras.filter(o => o.id !== id));
     setStore('loading', false);
@@ -180,7 +181,7 @@ const addOperario = async (operarioData: Omit<Operario, 'id'>) => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch('/api/operarios', {
+    const response = await fetch(apiUrl('/api/operarios'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(operarioData)
@@ -199,7 +200,7 @@ const updateOperario = async (id: number, operarioData: Partial<Operario>) => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(`/api/operarios/${id}`, {
+    const response = await fetch(apiUrl(`/api/operarios/${id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(operarioData)
@@ -224,7 +225,7 @@ const deleteOperario = async (id: number) => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(`/api/operarios/${id}`, { method: 'DELETE' });
+    const response = await fetch(apiUrl(`/api/operarios/${id}`), { method: 'DELETE' });
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     setStore('operarios', store.operarios.filter(o => o.id !== id));
     setStore('loading', false);
@@ -239,7 +240,7 @@ const addPlaning = async (planingData: Omit<Planing, 'id'>) => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch('/api/planings', {
+    const response = await fetch(apiUrl('/api/planings'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(planingData)
@@ -258,7 +259,7 @@ const updatePlaning = async (id: number, planingData: Partial<Planing>) => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(`/api/planings/${id}`, {
+    const response = await fetch(apiUrl(`/api/planings/${id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(planingData)
@@ -283,7 +284,7 @@ const deletePlaning = async (id: number) => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(`/api/planings/${id}`, { method: 'DELETE' });
+    const response = await fetch(apiUrl(`/api/planings/${id}`), { method: 'DELETE' });
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     setStore('planings', store.planings.filter(p => p.id !== id));
     setStore('loading', false);
@@ -298,7 +299,7 @@ const addMaterial = async (materialData: Omit<Material, 'id'>) => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch('/api/materiales', {
+    const response = await fetch(apiUrl('/api/materiales'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(materialData)
@@ -320,7 +321,7 @@ const updateMaterial = async (id: number, materialData: Partial<Material>) => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(`/api/materiales/${id}`, {
+    const response = await fetch(apiUrl(`/api/materiales/${id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(materialData)
@@ -348,7 +349,7 @@ const deleteMaterial = async (id: number) => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(`/api/materiales/${id}`, { method: 'DELETE' });
+    const response = await fetch(apiUrl(`/api/materiales/${id}`), { method: 'DELETE' });
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     setStore('materiales', store.materiales.filter(m => m.id !== id));
     setStore('loading', false);
