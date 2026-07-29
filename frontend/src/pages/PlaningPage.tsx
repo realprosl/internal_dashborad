@@ -4,6 +4,8 @@ import { useAppStore } from "../store";
 import {
   CloseIcon,
   CalendarIcon,
+  PdfIcon,
+  PlusIcon,
 } from "../components/Icons";
 import DailyAssignmentModal from "../components/DailyAssignmentModal";
 import {
@@ -206,51 +208,56 @@ export default function PlaningPage() {
             Planing
           </h1>
         </div>
-        <Show when={store.isAdmin()}>
         <div class="flex space-x-3">
+          <Show when={store.isAdmin()}>
+            <button
+              onClick={handleCreate}
+              title="Nuevo Planing"
+              aria-label="Nuevo Planing"
+              class="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center"
+            >
+              <PlusIcon class="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setShowDailyAssignmentModal(true)}
+              title="Asignación Diaria"
+              aria-label="Asignación Diaria"
+              class="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center"
+            >
+              <CalendarIcon class="w-5 h-5" />
+            </button>
+          </Show>
           <button
-            onClick={handleCreate}
-            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+            onClick={() => handleGeneratePdf(formData().fecha)}
+            disabled={pdfLoading()}
+            title="Generar PDF"
+            aria-label="Generar PDF"
+            class="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center disabled:opacity-50"
           >
-            Nuevo Planing
-          </button>
-          <button
-            onClick={() => setShowDailyAssignmentModal(true)}
-            class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
-          >
-            Asignación Diaria
+            <Show when={pdfLoading()} fallback={<PdfIcon class="w-5 h-5" />}>
+              <svg
+                class="animate-spin h-5 w-5 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                />
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+            </Show>
           </button>
         </div>
-        </Show>
-        <button
-          onClick={() => handleGeneratePdf(formData().fecha)}
-          disabled={pdfLoading()}
-          class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center disabled:opacity-50"
-        >
-          <Show when={pdfLoading()} fallback="Generar PDF">
-            <svg
-              class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              />
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-            Generando...
-          </Show>
-        </button>
       </div>
       <Show when={pdfError()}>
         <div class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">

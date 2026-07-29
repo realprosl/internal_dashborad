@@ -4,6 +4,7 @@ import { useAppStore } from "../store";
 import {
   CloseIcon,
   PersonIcon,
+  PlusIcon,
 } from "../components/Icons";
 import {
   createSortHandler,
@@ -138,9 +139,11 @@ export default function OperariosPage() {
         <Show when={store.isAdmin()}>
         <button
           onClick={handleCreate}
-          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+          title="Nuevo Operario"
+          aria-label="Nuevo Operario"
+          class="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
         >
-          Nuevo Operario
+          <PlusIcon class="w-5 h-5" />
         </button>
         </Show>
       </div>

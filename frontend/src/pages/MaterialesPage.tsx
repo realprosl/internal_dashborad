@@ -3,6 +3,8 @@ import { useTheme } from "../contexts/ThemeContext";
 import { useAppStore } from "../store";
 import {
   CloseIcon,
+  BuildingIcon,
+  PlusIcon,
 } from "../components/Icons";
 import Notification from "../components/Notification";
 import {
@@ -217,6 +219,7 @@ export default function MaterialesPage() {
     <div class="p-6">
       <div class="flex justify-between items-center mb-6">
         <div class="flex items-center space-x-3">
+          <BuildingIcon class="text-blue-600 dark:text-blue-400" />
           <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
             Materiales
           </h1>
@@ -224,9 +227,11 @@ export default function MaterialesPage() {
         <Show when={store.isAdmin()}>
         <button
           onClick={handleCreate}
-          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+          title="Nuevo Material"
+          aria-label="Nuevo Material"
+          class="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
         >
-          Nuevo Material
+          <PlusIcon class="w-5 h-5" />
         </button>
         </Show>
       </div>

@@ -1,7 +1,7 @@
 import { For, Show, createSignal, createMemo, createEffect } from "solid-js";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAppStore } from "../store";
-import { CloseIcon, BuildingIcon } from "../components/Icons";
+import { CloseIcon, BuildingIcon, PlusIcon } from "../components/Icons";
 import Notification from "../components/Notification";
 import {
   createSortHandler,
@@ -196,9 +196,11 @@ export default function ObrasPage() {
         <Show when={store.isAdmin()}>
           <button
             onClick={handleCreate}
-            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+            title="Nueva Obra"
+            aria-label="Nueva Obra"
+            class="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
           >
-            Nueva Obra
+            <PlusIcon class="w-5 h-5" />
         </button>
         </Show>
       </div>
