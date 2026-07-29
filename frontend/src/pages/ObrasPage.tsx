@@ -1,4 +1,4 @@
-import { For, createSignal, createMemo } from "solid-js";
+import { For, Show, createSignal, createMemo, createEffect } from "solid-js";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAppStore } from "../store";
 import { CloseIcon, BuildingIcon } from "../components/Icons";
@@ -41,6 +41,14 @@ export default function ObrasPage() {
   } | null>(null);
 
   // Computed
+  // Fallback: si el array está vacío (fetchAll falló parcial o no se
+  // ejecutó todavía), re-fetch. Igual que MaterialesPage.
+  createEffect(() => {
+    if (store.obras.length === 0 && !store.loading && store.currentUser) {
+      store.fetchObras();
+    }
+  });
+
   const filteredAndSorted = createMemo(() => {
     let filtered = store.obras;
 
@@ -185,12 +193,14 @@ export default function ObrasPage() {
             Obras
           </h1>
         </div>
-        <button
-          onClick={handleCreate}
-          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-        >
-          Nueva Obra
+        <Show when={store.isAdmin()}>
+          <button
+            onClick={handleCreate}
+            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+          >
+            Nueva Obra
         </button>
+        </Show>
       </div>
       <div class="mb-6 flex flex-col sm:flex-row gap-4">
         <div class="relative flex-grow">
@@ -285,12 +295,15 @@ export default function ObrasPage() {
             <For each={filteredAndSorted()}>
               {(obra) => (
                 <div
-                  class="grid grid-cols-5 text-center gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer items-center"
+                  class="grid grid-cols-5 text-center gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 items-center"
+                  classList={{ "cursor-pointer": store.isAdmin() }}
                   onClick={(e) => {
+                    if (!store.isAdmin()) return;
                     e.preventDefault();
                     handleEdit(obra.id);
                   }}
                   onContextMenu={(e) => {
+                    if (!store.isAdmin()) return;
                     e.preventDefault();
                     handleDelete(obra.id);
                   }}

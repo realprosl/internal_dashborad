@@ -1,4 +1,4 @@
-import { For, createSignal, createMemo } from "solid-js";
+import { For, Show, createSignal, createMemo, createEffect } from "solid-js";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAppStore } from "../store";
 import {
@@ -12,7 +12,7 @@ import {
   createFilterAndSort,
   type SortDirection,
 } from "../utils";
-import { apiUrl } from "../config";
+import { apiFetch } from "../config";
 import type { Planing } from "../types";
 
 type SortField = keyof Planing;
@@ -36,6 +36,13 @@ export default function PlaningPage() {
   });
 
   // Computed
+  // Fallback: si el array está vacío, re-fetch (igual que MaterialesPage).
+  createEffect(() => {
+    if (store.planings.length === 0 && !store.loading && store.currentUser) {
+      store.fetchPlanings();
+    }
+  });
+
   const filteredAndSorted = createMemo(() => {
     return createFilterAndSort({
       data: store.planings || [],
@@ -133,16 +140,10 @@ export default function PlaningPage() {
     }[],
   ) => {
     try {
-      const response = await fetch(apiUrl("/api/planings/batch"), {
+      await apiFetch("/api/planings/batch", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fecha, operations }),
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error ${response.status}: ${errorText}`);
-      }
 
       // Recargar la lista de planings para reflejar los cambios
       await store.fetchPlanings();
@@ -168,6 +169,7 @@ export default function PlaningPage() {
             Planing
           </h1>
         </div>
+        <Show when={store.isAdmin()}>
         <div class="flex space-x-3">
           <button
             onClick={handleCreate}
@@ -182,6 +184,7 @@ export default function PlaningPage() {
             Asignación Diaria
           </button>
         </div>
+        </Show>
       </div>
       <div class="mb-6 relative">
         <input
@@ -264,12 +267,15 @@ export default function PlaningPage() {
             <For each={filteredAndSorted()}>
               {(planing) => (
                 <div
-                  class="grid grid-cols-4 gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer items-center text-center"
+                  class="grid grid-cols-4 gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 items-center text-center"
+                  classList={{ "cursor-pointer": store.isAdmin() }}
                   onClick={(e) => {
+                    if (!store.isAdmin()) return;
                     e.preventDefault();
                     handleEdit(planing.id);
                   }}
                   onContextMenu={(e) => {
+                    if (!store.isAdmin()) return;
                     e.preventDefault();
                     handleDelete(planing.id);
                   }}

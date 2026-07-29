@@ -48,14 +48,23 @@ func Init() error {
 	}
 	log.Printf("Database path: %s", absPath)
 
+	// Pragmas: foreign_keys=ON enforces the FK on sessions.user_id;
+	// journal_mode=WAL lets concurrent readers (one per request) coexist
+	// with the writer without "database is locked" errors. SetMaxOpenConns
+	// stays at default; WAL handles concurrency.
+	dsn := absPath + "?_foreign_keys=on&_journal_mode=WAL"
 	var errOpen error
-	DB, errOpen = sql.Open("sqlite3", absPath)
+	DB, errOpen = sql.Open("sqlite3", dsn)
 	if errOpen != nil {
 		return fmt.Errorf("failed to open database: %v", errOpen)
 	}
 
 	if err := DB.Ping(); err != nil {
 		return fmt.Errorf("failed to ping database: %v", err)
+	}
+
+	if err := Migrate(DB); err != nil {
+		return fmt.Errorf("migration failed: %v", err)
 	}
 
 	log.Println("Database connection established")

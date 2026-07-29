@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -9,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"crud-app/config"
 	"crud-app/database"
 	"crud-app/handlers"
 )
@@ -28,13 +28,7 @@ func enableCORS(next http.Handler) http.Handler {
 	})
 }
 
-func jsonResponse(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		log.Printf("Error encoding JSON response: %v", err)
-	}
-}
+// jsonResponse lives in handlers/response.go now.
 
 func parseIDFromPath(path, prefix string) (int, bool) {
 	if !strings.HasPrefix(path, prefix) {
@@ -54,15 +48,23 @@ func main() {
 	}
 	defer database.Close()
 
+	cfg := config.Load()
+
 	obraHandler := handlers.NewObraHandler()
 	operarioHandler := handlers.NewOperarioHandler()
 	planingHandler := handlers.NewPlaningHandler()
 	materialHandler := handlers.NewMaterialHandler()
+	authHandler := handlers.NewAuthHandler(cfg)
+
+	// Sub-mux for /api/* goes through RequireAuth -> RequireAdminForWrites.
+	// This is the only place that wires the middleware; individual handler
+	// methods don't need to know about auth.
+	apiMux := http.NewServeMux()
 
 	mux := http.NewServeMux()
 
 	// API routes
-	mux.HandleFunc("/api/obras", func(w http.ResponseWriter, r *http.Request) {
+	apiMux.HandleFunc("/api/obras", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			obraHandler.GetObras(w, r)
@@ -73,7 +75,7 @@ func main() {
 		}
 	})
 
-	mux.HandleFunc("/api/obras/", func(w http.ResponseWriter, r *http.Request) {
+	apiMux.HandleFunc("/api/obras/", func(w http.ResponseWriter, r *http.Request) {
 		id, ok := parseIDFromPath(r.URL.Path, "/api/obras/")
 		if !ok {
 			http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -92,7 +94,7 @@ func main() {
 		}
 	})
 
-	mux.HandleFunc("/api/operarios", func(w http.ResponseWriter, r *http.Request) {
+	apiMux.HandleFunc("/api/operarios", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			operarioHandler.GetOperarios(w, r)
@@ -103,7 +105,7 @@ func main() {
 		}
 	})
 
-	mux.HandleFunc("/api/operarios/", func(w http.ResponseWriter, r *http.Request) {
+	apiMux.HandleFunc("/api/operarios/", func(w http.ResponseWriter, r *http.Request) {
 		id, ok := parseIDFromPath(r.URL.Path, "/api/operarios/")
 		if !ok {
 			http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -122,7 +124,7 @@ func main() {
 		}
 	})
 
-	mux.HandleFunc("/api/planings", func(w http.ResponseWriter, r *http.Request) {
+	apiMux.HandleFunc("/api/planings", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			planingHandler.GetPlanings(w, r)
@@ -133,7 +135,7 @@ func main() {
 		}
 	})
 
-	mux.HandleFunc("/api/planings/", func(w http.ResponseWriter, r *http.Request) {
+	apiMux.HandleFunc("/api/planings/", func(w http.ResponseWriter, r *http.Request) {
 		id, ok := parseIDFromPath(r.URL.Path, "/api/planings/")
 		if !ok {
 			http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -153,7 +155,7 @@ func main() {
 	})
 
 	// Endpoint para obtener asignaciones por fecha
-	mux.HandleFunc("/api/planings/date/", func(w http.ResponseWriter, r *http.Request) {
+	apiMux.HandleFunc("/api/planings/date/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -167,7 +169,7 @@ func main() {
 	})
 
 	// Endpoint para procesar operaciones en lote
-	mux.HandleFunc("/api/planings/batch", func(w http.ResponseWriter, r *http.Request) {
+	apiMux.HandleFunc("/api/planings/batch", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -176,7 +178,7 @@ func main() {
 	})
 
 	// Rutas para Materiales
-	mux.HandleFunc("/api/materiales", func(w http.ResponseWriter, r *http.Request) {
+	apiMux.HandleFunc("/api/materiales", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			materialHandler.GetMateriales(w, r)
@@ -187,7 +189,7 @@ func main() {
 		}
 	})
 
-	mux.HandleFunc("/api/materiales/", func(w http.ResponseWriter, r *http.Request) {
+	apiMux.HandleFunc("/api/materiales/", func(w http.ResponseWriter, r *http.Request) {
 		id, ok := parseIDFromPath(r.URL.Path, "/api/materiales/")
 		if !ok {
 			http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -205,6 +207,16 @@ func main() {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+
+	// Mount /api/* behind auth middleware. Order: RequireAuth (parses cookie,
+	// attaches user) → RequireAdminForWrites (rejects writes from non-admin).
+	mux.Handle("/api/", handlers.RequireAuth(handlers.RequireAdminForWrites(apiMux)))
+
+	// Auth routes (public — no middleware).
+	mux.HandleFunc("/auth/google", authHandler.GoogleLogin)
+	mux.HandleFunc("/auth/google/callback", authHandler.GoogleCallback)
+	mux.HandleFunc("/auth/logout", authHandler.Logout)
+	mux.HandleFunc("/auth/me", authHandler.Me)
 
 	// Servir archivos estáticos del frontend
 	// Primero intentar desde el directorio actual (para producción/build)
@@ -235,13 +247,16 @@ func main() {
 	assetsPath := filepath.Join(frontendDist, "assets")
 	mux.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(assetsPath))))
 
-	// Servir index.html para cualquier otra ruta (SPA)
+	// Servir index.html para cualquier otra ruta (SPA).
+	// Explicitamente excluimos /api y /auth para que rutas no registradas
+	// devuelvan 404 en lugar de servir el HTML del SPA (debug-friendly).
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" || !strings.HasPrefix(r.URL.Path, "/api") && !strings.HasPrefix(r.URL.Path, "/assets") {
-			http.ServeFile(w, r, filepath.Join(frontendDist, "index.html"))
+		p := r.URL.Path
+		if strings.HasPrefix(p, "/api") || strings.HasPrefix(p, "/auth") {
+			http.NotFound(w, r)
 			return
 		}
-		http.NotFound(w, r)
+		http.ServeFile(w, r, filepath.Join(frontendDist, "index.html"))
 	})
 
 	handler := enableCORS(mux)

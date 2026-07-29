@@ -1,3 +1,11 @@
+export type User = {
+  id: number;
+  email: string;
+  name: string;
+  picture_url: string;
+  role: "admin" | "user";
+};
+
 export type Obra = {
   id: number;
   nombre: string;

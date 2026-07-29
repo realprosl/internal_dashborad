@@ -1,31 +1,80 @@
 import { createStore } from 'solid-js/store';
-import type { Obra, Operario, Planing, Material } from '../types';
-import { apiUrl } from '../config';
+import type { Obra, Operario, Planing, Material, User } from '../types';
+import { apiFetch, ApiError, apiUrl } from '../config';
 
-// Create the store
 const [store, setStore] = createStore({
-  // Estado inicial
+  // Estado inicial — authLoading=true evita que el guard redirija a
+  // /login antes de saber si hay sesión.
   obras: [] as Obra[],
   operarios: [] as Operario[],
   planings: [] as Planing[],
   materiales: [] as Material[],
   loading: false,
   error: null as string | null,
+  currentUser: null as User | null,
+  authLoading: true as boolean,
 });
 
-// Acciones de fetching
+/**
+ * Hook called from the auth guard (AppInitializer). On 401 clears the user
+ * so the guard redirects to /login. On any other error keeps state as-is
+ * (offline shouldn't trigger logout).
+ */
+const fetchCurrentUser = async (): Promise<User | null> => {
+  setStore('authLoading', true);
+  try {
+    const user = await apiFetch<User>('/auth/me');
+    setStore('currentUser', user);
+    setStore('authLoading', false);
+    return user;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      setStore('currentUser', null);
+    }
+    setStore('authLoading', false);
+    return null;
+  }
+};
+
+const logout = async () => {
+  try {
+    await apiFetch('/auth/logout', { method: 'POST' });
+  } catch {
+    // ignore — borramos el estado local igualmente
+  }
+  setStore('currentUser', null);
+  setStore('obras', []);
+  setStore('operarios', []);
+  setStore('planings', []);
+  setStore('materiales', []);
+};
+
+// Cuando una llamada autenticada falla con 401 (sesión expirada) limpiamos
+// el currentUser para que el guard redirija a /login. Un 403 (sin permisos)
+// NO redirige — solo se setea el error para mostrarlo al usuario.
+const handleAuthError = (err: unknown): never => {
+  if (err instanceof ApiError) {
+    if (err.status === 401) {
+      setStore('currentUser', null);
+    }
+    setStore('error', err.message);
+  } else {
+    const msg = err instanceof Error ? err.message : 'Error desconocido';
+    setStore('error', msg);
+  }
+  throw err;
+};
+
 const fetchObras = async () => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl('/api/obras'));
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    const obras = await response.json();
+    const obras = await apiFetch<Obra[]>('/api/obras');
     setStore('obras', obras);
     setStore('loading', false);
-  } catch (error) {
-    setStore('error', error instanceof Error ? error.message : 'Error fetching obras');
+  } catch (err) {
     setStore('loading', false);
+    handleAuthError(err);
   }
 };
 
@@ -33,14 +82,12 @@ const fetchOperarios = async () => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl('/api/operarios'));
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    const operarios = await response.json();
+    const operarios = await apiFetch<Operario[]>('/api/operarios');
     setStore('operarios', operarios);
     setStore('loading', false);
-  } catch (error) {
-    setStore('error', error instanceof Error ? error.message : 'Error fetching operarios');
+  } catch (err) {
     setStore('loading', false);
+    handleAuthError(err);
   }
 };
 
@@ -48,14 +95,12 @@ const fetchPlanings = async () => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl('/api/planings'));
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    const planings = await response.json();
+    const planings = await apiFetch<Planing[]>('/api/planings');
     setStore('planings', planings);
     setStore('loading', false);
-  } catch (error) {
-    setStore('error', error instanceof Error ? error.message : 'Error fetching planings');
+  } catch (err) {
     setStore('loading', false);
+    handleAuthError(err);
   }
 };
 
@@ -63,350 +108,258 @@ const fetchMateriales = async () => {
   setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl('/api/materiales'));
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    const materiales = await response.json();
+    const materiales = await apiFetch<Material[]>('/api/materiales');
     setStore('materiales', materiales);
     setStore('loading', false);
-  } catch (error) {
-    setStore('error', error instanceof Error ? error.message : 'Error fetching materiales');
+  } catch (err) {
     setStore('loading', false);
+    handleAuthError(err);
   }
 };
 
 const fetchAll = async () => {
   setStore('loading', true);
   setStore('error', null);
-  try {
-    const [obrasRes, operariosRes, planingsRes, materialesRes] = await Promise.all([
-      fetch(apiUrl('/api/obras')),
-      fetch(apiUrl('/api/operarios')),
-      fetch(apiUrl('/api/planings')),
-      fetch(apiUrl('/api/materiales'))
-    ]);
 
-    if (!obrasRes.ok) throw new Error(`HTTP ${obrasRes.status}: Error fetching obras`);
-    if (!operariosRes.ok) throw new Error(`HTTP ${operariosRes.status}: Error fetching operarios`);
-    if (!planingsRes.ok) throw new Error(`HTTP ${planingsRes.status}: Error fetching planings`);
-    if (!materialesRes.ok) throw new Error(`HTTP ${materialesRes.status}: Error fetching materiales`);
+  // Usamos allSettled para que un fallo de un endpoint no impida
+  // rellenar los otros. Si los 4 fallan, mostramos el primer error.
+  const results = await Promise.allSettled([
+    apiFetch<Obra[]>('/api/obras'),
+    apiFetch<Operario[]>('/api/operarios'),
+    apiFetch<Planing[]>('/api/planings'),
+    apiFetch<Material[]>('/api/materiales'),
+  ]);
 
-    const obras = await obrasRes.json();
-    const operarios = await operariosRes.json();
-    const planings = await planingsRes.json();
-    const materiales = await materialesRes.json();
+  const update: Partial<{
+    obras: Obra[];
+    operarios: Operario[];
+    planings: Planing[];
+    materiales: Material[];
+    loading: boolean;
+    error: string | null;
+  }> = { loading: false };
 
-    setStore({
-      obras,
-      operarios,
-      planings,
-      materiales,
-      loading: false
-    });
-  } catch (error) {
-    setStore('error', error instanceof Error ? error.message : 'Error fetching data');
-    setStore('loading', false);
+  const errors: string[] = [];
+  if (results[0].status === "fulfilled") update.obras = results[0].value;
+  else errors.push("obras: " + (results[0].reason?.message ?? "failed"));
+  if (results[1].status === "fulfilled") update.operarios = results[1].value;
+  else errors.push("operarios: " + (results[1].reason?.message ?? "failed"));
+  if (results[2].status === "fulfilled") update.planings = results[2].value;
+  else errors.push("planings: " + (results[2].reason?.message ?? "failed"));
+  if (results[3].status === "fulfilled") update.materiales = results[3].value;
+  else errors.push("materiales: " + (results[3].reason?.message ?? "failed"));
+
+  if (errors.length > 0) {
+    update.error = errors.join(" | ");
   }
+
+  setStore(update);
 };
 
-// Acciones CRUD para Obras
+// CRUD Obras
 const addObra = async (obraData: Omit<Obra, 'id'>) => {
-  setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl('/api/obras'), {
+    const newObra = await apiFetch<Obra>('/api/obras', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(obraData)
+      body: JSON.stringify(obraData),
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    const newObra = await response.json();
     setStore('obras', [...store.obras, newObra]);
-    setStore('loading', false);
     return newObra;
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Error adding obra';
-    setStore('error', errorMsg);
-    setStore('loading', false);
-    throw new Error(errorMsg);
+  } catch (err) {
+    handleAuthError(err);
   }
 };
 
 const updateObra = async (id: number, obraData: Partial<Obra>) => {
-  setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl(`/api/obras/${id}`), {
+    const updated = await apiFetch<Obra>(`/api/obras/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(obraData)
+      body: JSON.stringify(obraData),
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    const updatedObra = await response.json();
-
-    // Update the specific obra in the store
-    const index = store.obras.findIndex(o => o.id === id);
-    if (index !== -1) {
-      setStore('obras', index, updatedObra);
-    }
-
-    setStore('loading', false);
-    return updatedObra;
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Error updating obra';
-    setStore('error', errorMsg);
-    setStore('loading', false);
-    throw new Error(errorMsg);
+    const idx = store.obras.findIndex(o => o.id === id);
+    if (idx !== -1) setStore('obras', idx, updated);
+    return updated;
+  } catch (err) {
+    handleAuthError(err);
   }
 };
 
 const deleteObra = async (id: number) => {
-  setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl(`/api/obras/${id}`), { method: 'DELETE' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    await apiFetch(`/api/obras/${id}`, { method: 'DELETE' });
     setStore('obras', store.obras.filter(o => o.id !== id));
-    setStore('loading', false);
-    return true;
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Error deleting obra';
-    setStore('error', errorMsg);
-    setStore('loading', false);
-    throw new Error(errorMsg);
+  } catch (err) {
+    handleAuthError(err);
   }
 };
 
-// Acciones CRUD para Operarios
+// CRUD Operarios
 const addOperario = async (operarioData: Omit<Operario, 'id'>) => {
-  setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl('/api/operarios'), {
+    const newOperario = await apiFetch<Operario>('/api/operarios', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(operarioData)
+      body: JSON.stringify(operarioData),
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    const newOperario = await response.json();
     setStore('operarios', [...store.operarios, newOperario]);
-    setStore('loading', false);
-  } catch (error) {
-    setStore('error', error instanceof Error ? error.message : 'Error adding operario');
-    setStore('loading', false);
+  } catch (err) {
+    handleAuthError(err);
   }
 };
 
 const updateOperario = async (id: number, operarioData: Partial<Operario>) => {
-  setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl(`/api/operarios/${id}`), {
+    const updated = await apiFetch<Operario>(`/api/operarios/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(operarioData)
+      body: JSON.stringify(operarioData),
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    const updatedOperario = await response.json();
-
-    // Update the specific operario in the store
-    const index = store.operarios.findIndex(o => o.id === id);
-    if (index !== -1) {
-      setStore('operarios', index, updatedOperario);
-    }
-
-    setStore('loading', false);
-  } catch (error) {
-    setStore('error', error instanceof Error ? error.message : 'Error updating operario');
-    setStore('loading', false);
+    const idx = store.operarios.findIndex(o => o.id === id);
+    if (idx !== -1) setStore('operarios', idx, updated);
+  } catch (err) {
+    handleAuthError(err);
   }
 };
 
 const deleteOperario = async (id: number) => {
-  setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl(`/api/operarios/${id}`), { method: 'DELETE' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    await apiFetch(`/api/operarios/${id}`, { method: 'DELETE' });
     setStore('operarios', store.operarios.filter(o => o.id !== id));
-    setStore('loading', false);
-  } catch (error) {
-    setStore('error', error instanceof Error ? error.message : 'Error deleting operario');
-    setStore('loading', false);
+  } catch (err) {
+    handleAuthError(err);
   }
 };
 
-// Acciones CRUD para Planings
+// CRUD Planings
 const addPlaning = async (planingData: Omit<Planing, 'id'>) => {
-  setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl('/api/planings'), {
+    const newPlaning = await apiFetch<Planing>('/api/planings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(planingData)
+      body: JSON.stringify(planingData),
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    const newPlaning = await response.json();
     setStore('planings', [...store.planings, newPlaning]);
-    setStore('loading', false);
-  } catch (error) {
-    setStore('error', error instanceof Error ? error.message : 'Error adding planing');
-    setStore('loading', false);
+  } catch (err) {
+    handleAuthError(err);
   }
 };
 
 const updatePlaning = async (id: number, planingData: Partial<Planing>) => {
-  setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl(`/api/planings/${id}`), {
+    const updated = await apiFetch<Planing>(`/api/planings/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(planingData)
+      body: JSON.stringify(planingData),
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    const updatedPlaning = await response.json();
-
-    // Update the specific planing in the store
-    const index = store.planings.findIndex(p => p.id === id);
-    if (index !== -1) {
-      setStore('planings', index, updatedPlaning);
-    }
-
-    setStore('loading', false);
-  } catch (error) {
-    setStore('error', error instanceof Error ? error.message : 'Error updating planing');
-    setStore('loading', false);
+    const idx = store.planings.findIndex(p => p.id === id);
+    if (idx !== -1) setStore('planings', idx, updated);
+  } catch (err) {
+    handleAuthError(err);
   }
 };
 
 const deletePlaning = async (id: number) => {
-  setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl(`/api/planings/${id}`), { method: 'DELETE' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    await apiFetch(`/api/planings/${id}`, { method: 'DELETE' });
     setStore('planings', store.planings.filter(p => p.id !== id));
-    setStore('loading', false);
-  } catch (error) {
-    setStore('error', error instanceof Error ? error.message : 'Error deleting planing');
-    setStore('loading', false);
+  } catch (err) {
+    handleAuthError(err);
   }
 };
 
-// Acciones CRUD para Materiales
+// CRUD Materiales
 const addMaterial = async (materialData: Omit<Material, 'id'>) => {
-  setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl('/api/materiales'), {
+    const newMaterial = await apiFetch<Material>('/api/materiales', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(materialData)
+      body: JSON.stringify(materialData),
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    const newMaterial = await response.json();
     setStore('materiales', [...store.materiales, newMaterial]);
-    setStore('loading', false);
     return newMaterial;
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Error adding material';
-    setStore('error', errorMsg);
-    setStore('loading', false);
-    throw new Error(errorMsg);
+  } catch (err) {
+    handleAuthError(err);
   }
 };
 
 const updateMaterial = async (id: number, materialData: Partial<Material>) => {
-  setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl(`/api/materiales/${id}`), {
+    const updated = await apiFetch<Material>(`/api/materiales/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(materialData)
+      body: JSON.stringify(materialData),
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    const updatedMaterial = await response.json();
-
-    // Update the specific material in the store
-    const index = store.materiales.findIndex(m => m.id === id);
-    if (index !== -1) {
-      setStore('materiales', index, updatedMaterial);
-    }
-
-    setStore('loading', false);
-    return updatedMaterial;
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Error updating material';
-    setStore('error', errorMsg);
-    setStore('loading', false);
-    throw new Error(errorMsg);
+    const idx = store.materiales.findIndex(m => m.id === id);
+    if (idx !== -1) setStore('materiales', idx, updated);
+    return updated;
+  } catch (err) {
+    handleAuthError(err);
   }
 };
 
 const deleteMaterial = async (id: number) => {
-  setStore('loading', true);
   setStore('error', null);
   try {
-    const response = await fetch(apiUrl(`/api/materiales/${id}`), { method: 'DELETE' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    await apiFetch(`/api/materiales/${id}`, { method: 'DELETE' });
     setStore('materiales', store.materiales.filter(m => m.id !== id));
-    setStore('loading', false);
     return true;
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Error deleting material';
-    setStore('error', errorMsg);
-    setStore('loading', false);
-    throw new Error(errorMsg);
+  } catch (err) {
+    handleAuthError(err);
   }
 };
 
 // Helpers
-const getObraById = (id: number) => {
-  return store.obras.find(o => o.id === id);
+const getObraById = (id: number) => store.obras.find(o => o.id === id);
+const getOperarioById = (id: number) =>
+  store.operarios.find(o => o.id === id);
+const getPlaningById = (id: number) =>
+  store.planings.find(p => p.id === id);
+const getMaterialById = (id: number) =>
+  store.materiales.find(m => m.id === id);
+
+// Auth helpers
+const isAdmin = () => store.currentUser?.role === 'admin';
+const isAuthenticated = () => store.currentUser !== null;
+
+// Login: navega al endpoint que arranca el OAuth flow. Usamos ruta relativa
+// (apiUrl con prefijo '') para que en dev pase por el proxy y la cookie
+// quede en el origen del frontend (SameSite=Lax funciona).
+const login = () => {
+  window.location.href = apiUrl('/auth/google');
 };
 
-const getOperarioById = (id: number) => {
-  return store.operarios.find(o => o.id === id);
-};
-
-const getPlaningById = (id: number) => {
-  return store.planings.find(p => p.id === id);
-};
-
-const getMaterialById = (id: number) => {
-  return store.materiales.find(m => m.id === id);
-};
-
-// Export the store and actions
 export const useAppStore = () => ({
-  // State
   ...store,
 
-  // Actions
+  // Auth
+  fetchCurrentUser,
+  logout,
+  login,
+  isAdmin,
+  isAuthenticated,
+
+  // Datos
   fetchObras,
   fetchOperarios,
   fetchPlanings,
+  fetchMateriales,
   fetchAll,
 
-  // CRUD Obras
+  // CRUD
   addObra,
   updateObra,
   deleteObra,
-
-  // CRUD Operarios
   addOperario,
   updateOperario,
   deleteOperario,
-
-  // CRUD Planings
   addPlaning,
   updatePlaning,
   deletePlaning,
-
-  // CRUD Materiales
-  fetchMateriales,
   addMaterial,
   updateMaterial,
   deleteMaterial,

@@ -1,4 +1,4 @@
-import { For, createSignal, createMemo, createEffect } from "solid-js";
+import { For, Show, createSignal, createMemo, createEffect } from "solid-js";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAppStore } from "../store";
 import {
@@ -221,12 +221,14 @@ export default function MaterialesPage() {
             Materiales
           </h1>
         </div>
+        <Show when={store.isAdmin()}>
         <button
           onClick={handleCreate}
           class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
         >
           Nuevo Material
         </button>
+        </Show>
       </div>
       <div class="mb-6 flex flex-col sm:flex-row gap-4">
         <div class="relative flex-grow">
@@ -314,12 +316,15 @@ export default function MaterialesPage() {
 
                 return (
                   <div
-                    class="grid grid-cols-5 text-center gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer items-center"
+                    class="grid grid-cols-5 text-center gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 items-center"
+                    classList={{ "cursor-pointer": store.isAdmin() }}
                     onClick={(e) => {
+                      if (!store.isAdmin()) return;
                       e.preventDefault();
                       handleEdit(material.id);
                     }}
                     onContextMenu={(e) => {
+                      if (!store.isAdmin()) return;
                       e.preventDefault();
                       handleDelete(material.id);
                     }}

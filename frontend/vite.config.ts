@@ -15,7 +15,13 @@ export default defineConfig(({ mode }) => {
     plugins: [solid()],
     server: {
       proxy: {
+        // /api/* y /auth/* van al backend. Same-origin desde el punto
+        // de vista del navegador → las cookies SameSite=Lax funcionan.
         '/api': {
+          target: apiTarget,
+          changeOrigin: true,
+        },
+        '/auth': {
           target: apiTarget,
           changeOrigin: true,
         },

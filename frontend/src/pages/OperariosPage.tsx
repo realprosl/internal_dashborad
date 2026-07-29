@@ -1,4 +1,4 @@
-import { For, createSignal, createMemo } from "solid-js";
+import { For, Show, createSignal, createMemo, createEffect } from "solid-js";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAppStore } from "../store";
 import {
@@ -36,6 +36,13 @@ export default function OperariosPage() {
   const [gastoDiarioText, setGastoDiarioText] = createSignal("0,00");
 
   // Computed
+  // Fallback: si el array está vacío, re-fetch (igual que MaterialesPage).
+  createEffect(() => {
+    if (store.operarios.length === 0 && !store.loading && store.currentUser) {
+      store.fetchOperarios();
+    }
+  });
+
   const filteredAndSorted = createMemo(() => {
     return createFilterAndSort({
       data: store.operarios,
@@ -128,12 +135,14 @@ export default function OperariosPage() {
             Operarios
           </h1>
         </div>
+        <Show when={store.isAdmin()}>
         <button
           onClick={handleCreate}
           class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
         >
           Nuevo Operario
         </button>
+        </Show>
       </div>
       <div class="mb-6 relative">
         <input
@@ -209,12 +218,15 @@ export default function OperariosPage() {
             <For each={filteredAndSorted()}>
               {(operario) => (
                 <div
-                  class="grid grid-cols-4 gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer items-center text-center"
+                  class="grid grid-cols-4 gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 items-center text-center"
+                  classList={{ "cursor-pointer": store.isAdmin() }}
                   onClick={(e) => {
+                    if (!store.isAdmin()) return;
                     e.preventDefault();
                     handleEdit(operario.id);
                   }}
                   onContextMenu={(e) => {
+                    if (!store.isAdmin()) return;
                     e.preventDefault();
                     handleDelete(operario.id);
                   }}
