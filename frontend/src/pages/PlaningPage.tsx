@@ -12,8 +12,9 @@ import {
   createFilterAndSort,
   type SortDirection,
 } from "../utils";
-import { apiFetch } from "../config";
-import type { Planing } from "../types";
+import { generateDailyAssignmentPDF } from "../utils/pdf";
+import { apiFetch, ApiError } from "../config";
+import type { Planing, Obra, Operario } from "../types";
 
 type SortField = keyof Planing;
 
@@ -34,6 +35,8 @@ export default function PlaningPage() {
     operario_id: 0,
     obra_id: 0,
   });
+  const [pdfLoading, setPdfLoading] = createSignal(false);
+  const [pdfError, setPdfError] = createSignal<string | null>(null);
 
   // Computed
   // Fallback: si el array está vacío, re-fetch (igual que MaterialesPage).
@@ -153,6 +156,40 @@ export default function PlaningPage() {
     }
   };
 
+  // Genera PDF de la asignación para la fecha indicada (default: hoy).
+  // Reusa los datos que ya tiene el store; si faltan obras activas o
+  // operarios, los pide al backend.
+  const handleGeneratePdf = async (fecha: string) => {
+    setPdfLoading(true);
+    setPdfError(null);
+    try {
+      const [obras, operarios, assignments] = await Promise.all([
+        apiFetch<Obra[]>("/api/obras?estado=activa"),
+        apiFetch<Operario[]>("/api/operarios?estado=activo"),
+        apiFetch<{ obra_id: number; operario_id: number }[]>(
+          `/api/planings/date/${fecha}`,
+        ).catch((err) => {
+          if (err instanceof ApiError && err.status === 404) return [];
+          throw err;
+        }),
+      ]);
+
+      const map = new Set(
+        assignments.map((a) => `${a.obra_id}-${a.operario_id}`),
+      );
+      const isAssigned = (obraId: number, operarioId: number) =>
+        map.has(`${obraId}-${operarioId}`);
+
+      generateDailyAssignmentPDF({ fecha, obras, operarios, isAssigned });
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Error al generar PDF";
+      setPdfError(msg);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   const handleInputChange = (
     field: keyof ReturnType<typeof formData>,
     value: any,
@@ -185,7 +222,43 @@ export default function PlaningPage() {
           </button>
         </div>
         </Show>
+        <button
+          onClick={() => handleGeneratePdf(formData().fecha)}
+          disabled={pdfLoading()}
+          class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center disabled:opacity-50"
+        >
+          <Show when={pdfLoading()} fallback="Generar PDF">
+            <svg
+              class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              />
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            Generando...
+          </Show>
+        </button>
       </div>
+      <Show when={pdfError()}>
+        <div class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+          <p class="text-sm text-red-800 dark:text-red-200">
+            {pdfError()}
+          </p>
+        </div>
+      </Show>
       <div class="mb-6 relative">
         <input
           type="text"

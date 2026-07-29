@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@solidjs/router": "^0.16.1",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "solid-js": "^1.7.8"
   },
   "devDependencies": {
