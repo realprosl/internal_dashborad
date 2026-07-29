@@ -289,8 +289,10 @@ export default function PlaningPage() {
                   <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
                     {planing.operario_nombre}
                   </div>
-                  <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                    {planing.obra_nombre}
+                  <div class="flex items-center justify-start text-sm text-gray-900 dark:text-white overflow-hidden">
+                    <span class="truncate" title={planing.obra_nombre}>
+                      {planing.obra_nombre}
+                    </span>
                   </div>
                 </div>
               )}

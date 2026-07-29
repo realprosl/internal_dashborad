@@ -332,11 +332,15 @@ export default function MaterialesPage() {
                     <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
                       {material.fecha}
                     </div>
-                    <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                      {material.obra_nombre || `Obra ${material.obra_id}`}
+                    <div class="flex items-center justify-start text-sm text-gray-900 dark:text-white overflow-hidden">
+                      <span class="truncate" title={material.obra_nombre || `Obra ${material.obra_id}`}>
+                        {material.obra_nombre || `Obra ${material.obra_id}`}
+                      </span>
                     </div>
-                    <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                      {material.descripcion}
+                    <div class="flex items-center justify-start text-sm text-gray-900 dark:text-white overflow-hidden">
+                      <span class="truncate" title={material.descripcion}>
+                        {material.descripcion}
+                      </span>
                     </div>
                     <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
                       {formatSpanishFloat(total)}€

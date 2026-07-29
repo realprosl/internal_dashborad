@@ -311,8 +311,10 @@ export default function ObrasPage() {
                   <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
                     {obra.id}
                   </div>
-                  <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                    {obra.nombre}
+                  <div class="flex items-center justify-start text-sm text-gray-900 dark:text-white overflow-hidden">
+                    <span class="truncate" title={obra.nombre}>
+                      {obra.nombre}
+                    </span>
                   </div>
                   <div class="flex items-center justify-center text-sm text-gray-900 dark:text-white whitespace-nowrap">
                     {formatSpanishFloat(obra.valor_contrato)}€

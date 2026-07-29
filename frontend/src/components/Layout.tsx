@@ -1,4 +1,4 @@
-import { JSX, Show, createSignal } from "solid-js";
+import { JSX, Show, createSignal, createEffect, onCleanup } from "solid-js";
 import { A, useNavigate, useLocation } from "@solidjs/router";
 import { useTheme } from "../contexts/ThemeContext";
 import { SunIcon, MoonIcon, LogoRealpro, LogoutIcon } from "./Icons";
@@ -18,6 +18,8 @@ export default function Layout(props: { children?: JSX.Element }) {
   const store = useAppStore();
 
   const [menuOpen, setMenuOpen] = createSignal(false);
+  let buttonRef: HTMLButtonElement | undefined;
+  let menuRef: HTMLDivElement | undefined;
 
   const handleLogout = async () => {
     setMenuOpen(false);
@@ -25,15 +27,67 @@ export default function Layout(props: { children?: JSX.Element }) {
     navigate("/login", { replace: true });
   };
 
-  // Iniciales para el fallback del avatar (la URL de Google puede caducar).
+  // Iniciales: usa el nombre si existe; si no, la parte local del email
+  // (antes del @); si tampoco, "U". Nunca devuelve "--" ni vacío.
   const initials = () => {
-    const name = store.currentUser?.name || store.currentUser?.email || "?";
-    return name
-      .split(/[\s@.]/)
+    const name = (store.currentUser?.name || "").trim();
+    const email = (store.currentUser?.email || "").trim();
+    const local = email.includes("@") ? email.split("@")[0] : email;
+    const source = name || local || "U";
+    const parts = source
+      .split(/[\s._-]+/)
       .filter(Boolean)
-      .slice(0, 2)
-      .map((p) => p[0]?.toUpperCase())
-      .join("");
+      .slice(0, 2);
+    const result = parts.map((p) => p[0]?.toUpperCase() || "").join("");
+    return result || "?";
+  };
+
+  // Cerrar el dropdown cuando se hace click fuera del botón o del menú.
+  // Se monta cuando menuOpen() es true y se limpia al cerrar.
+  createEffect(() => {
+    if (!menuOpen()) return;
+
+    // setTimeout 0 → el click que abrió el menú no lo cierra inmediatamente
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (buttonRef?.contains(target)) return; // click en el toggle, no cerrar
+      if (menuRef?.contains(target)) return; // click dentro del menú, no cerrar
+      setMenuOpen(false);
+    };
+    const t = setTimeout(() => document.addEventListener("mousedown", handler), 0);
+    onCleanup(() => {
+      clearTimeout(t);
+      document.removeEventListener("mousedown", handler);
+    });
+  });
+
+  // Avatar reutilizable (botón + dropdown). Si picture_url carga bien se
+  // muestra; si falla o está vacía → iniciales.
+  const AvatarImg = () => {
+    const [errored, setErrored] = createSignal(false);
+    const url = () => store.currentUser?.picture_url;
+    return (
+      <Show
+        when={url() && !errored()}
+        fallback={
+          <div
+            data-fallback="initials"
+            class="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold flex-shrink-0"
+          >
+            {initials()}
+          </div>
+        }
+      >
+        <img
+          src={url()!}
+          alt={store.currentUser?.name || store.currentUser?.email || "Usuario"}
+          class="w-9 h-9 rounded-full object-cover flex-shrink-0"
+          onError={() => setErrored(true)}
+          referrerpolicy="no-referrer"
+        />
+      </Show>
+    );
   };
 
   return (
@@ -78,62 +132,47 @@ export default function Layout(props: { children?: JSX.Element }) {
                 )}
               </button>
 
-              {/* User menu */}
+              {/* User menu — avatar + email visible, dropdown con detalles */}
               <div class="relative">
                 <button
+                  ref={buttonRef}
                   onClick={() => setMenuOpen(!menuOpen())}
-                  class="flex items-center space-x-2 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="flex items-center space-x-3 pl-2 pr-3 py-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   aria-label="Menú de usuario"
                 >
-                  <Show
-                    when={store.currentUser?.picture_url}
-                    fallback={
-                      <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-medium">
-                        {initials()}
-                      </div>
-                    }
+                  <AvatarImg />
+                  <span
+                    class="hidden md:inline text-sm font-medium text-gray-700 dark:text-gray-200 max-w-[200px] truncate"
+                    title={store.currentUser?.email || ""}
                   >
-                    <img
-                      src={store.currentUser!.picture_url}
-                      alt={store.currentUser!.name}
-                      class="w-8 h-8 rounded-full object-cover"
-                      onError={(e) => {
-                        // Si la URL de Google caduca, fallback a iniciales
-                        (e.currentTarget as HTMLImageElement).style.display = "none";
-                        (e.currentTarget as HTMLImageElement)
-                          .parentElement!
-                          .querySelector(".initials-fallback")!.classList.remove(
-                          "hidden",
-                        );
-                      }}
-                    />
-                    <div class="initials-fallback hidden w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-medium">
-                      {initials()}
-                    </div>
-                  </Show>
+                    {store.currentUser?.email}
+                  </span>
                 </button>
 
                 <Show when={menuOpen()}>
                   <div
-                    class="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50"
-                    onClick={() => setMenuOpen(false)}
+                    ref={menuRef}
+                    class="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50"
                   >
-                    <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                      <div class="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {store.currentUser?.email}
+                    <div class="flex items-center space-x-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                      <AvatarImg />
+                      <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          {store.currentUser?.name || "Usuario"}
+                        </div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          {store.currentUser?.email}
+                        </div>
+                        <span
+                          class={`mt-1 inline-block px-2 py-0.5 text-xs rounded-full ${
+                            store.currentUser?.role === "admin"
+                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                              : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                          }`}
+                        >
+                          {store.currentUser?.role}
+                        </span>
                       </div>
-                      <div class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {store.currentUser?.name}
-                      </div>
-                      <span
-                        class={`mt-1 inline-block px-2 py-0.5 text-xs rounded-full ${
-                          store.currentUser?.role === "admin"
-                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                            : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
-                        }`}
-                      >
-                        {store.currentUser?.role}
-                      </span>
                     </div>
                     <button
                       onClick={handleLogout}
